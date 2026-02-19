@@ -125,7 +125,7 @@ export default function CreateEventPage() {
                       required
                       onChange={(e) => {
                         const [hours, minutes] = e.target.value.split(':');
-                        const date = formData.date || new Date();
+                        const date = new Date(formData.date || new Date());
                         date.setHours(parseInt(hours), parseInt(minutes));
                         setFormData({ ...formData, date });
                       }}

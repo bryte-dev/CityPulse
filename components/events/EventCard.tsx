@@ -19,8 +19,16 @@ const gradients = [
   'gradient-green',
 ];
 
+// Deterministic gradient selection based on event ID
+const getGradientClass = (eventId: string): string => {
+  const hash = eventId.split('').reduce((acc, char) => {
+    return char.charCodeAt(0) + ((acc << 5) - acc);
+  }, 0);
+  return gradients[Math.abs(hash) % gradients.length];
+};
+
 export function EventCard({ event }: EventCardProps) {
-  const gradientClass = gradients[Math.floor(Math.random() * gradients.length)];
+  const gradientClass = getGradientClass(event.id);
   
   return (
     <Link href={`/events/${event.id}`}>

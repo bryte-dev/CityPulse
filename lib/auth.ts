@@ -1,8 +1,14 @@
 import { betterAuth } from "better-auth";
 
+// Better-Auth configuration
+// Note: This uses SQLite for local development. For production with Firestore,
+// you would configure Better-Auth to use a Firestore adapter or keep using SQLite
+// for auth data while application data (events, comments) uses Firestore.
+// Better-Auth SQLite database is separate from Firebase Firestore.
+
 export const auth = betterAuth({
   database: {
-    provider: "sqlite", // We'll use Firebase Firestore in production, SQLite for local dev
+    provider: "sqlite",
     url: "./db.sqlite",
   },
   emailAndPassword: {

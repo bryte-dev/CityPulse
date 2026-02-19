@@ -102,7 +102,16 @@ export default function EventDetailPage() {
     'gradient-blue',
     'gradient-green',
   ];
-  const gradientClass = gradients[Math.floor(Math.random() * gradients.length)];
+  
+  // Deterministic gradient selection based on event ID
+  const getGradientClass = (eventId: string): string => {
+    const hash = eventId.split('').reduce((acc, char) => {
+      return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+    return gradients[Math.abs(hash) % gradients.length];
+  };
+  
+  const gradientClass = getGradientClass(event.id);
 
   return (
     <div className="min-h-screen flex flex-col">
