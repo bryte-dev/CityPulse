@@ -1,79 +1,150 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, use } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
 import {
-  Calendar,
-  MapPin,
-  Users,
-  Clock,
-  Tag,
-  Share2,
-  Heart,
-  Edit,
-  Trash2,
+  Calendar, MapPin, Users, Clock, ArrowLeft, Star, Send, Trash2, MessageCircle, UserCheck, UserMinus
 } from 'lucide-react';
-import type { Event } from '@/types';
-import { formatDate, formatTime } from '@/lib/utils';
+import { useSession } from '@/lib/auth-client';
+import {
+  getEvent, getEventRegistrations, getRegistration, createRegistration, deleteRegistration,
+  getEventComments, createComment, deleteComment
+} from '@/lib/db';
+import type { Event, Registration, Comment } from '@/types';
+import { formatDate } from '@/lib/utils';
 
-export default function EventDetailPage() {
-  const params = useParams();
+export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { data: session } = useSession();
   const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [myRegistration, setMyRegistration] = useState<Registration | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isParticipant, setIsParticipant] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [rating, setRating] = useState(5);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
-    // TODO: Fetch event from Firebase
-    // Mock data for now
-    const mockEvent: Event = {
-      id: params.id as string,
-      title: 'Festival de Musique Électronique',
-      description:
-        'Une soirée inoubliable avec les meilleurs DJs de Suisse romande. Venez danser sur les meilleurs morceaux électro du moment dans une ambiance festive et conviviale. Bar sur place et food trucks disponibles.',
-      date: new Date('2026-03-15T20:00:00'),
-      endDate: new Date('2026-03-16T04:00:00'),
-      location: {
-        address: 'Rue du Lac 15',
-        city: 'Lausanne',
-      },
-      organizerId: 'org1',
-      organizerName: 'EventPro',
-      organizerAvatar: undefined,
-      category: 'music',
-      tags: ['électro', 'danse', 'nuit', 'DJ'],
-      maxParticipants: 200,
-      currentParticipants: 87,
-      visibility: 'public',
-      isFree: false,
-      price: 25,
-      status: 'published',
-      participants: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    const load = async () => {
+      const [ev, regs, comms] = await Promise.all([
+        getEvent(id),
+        getEventRegistrations(id),
+        getEventComments(id),
+      ]);
+      setEvent(ev);
+      setRegistrations(regs);
+      setComments(comms);
+      if (session?.user) {
+        const myReg = await getRegistration(id, session.user.id);
+        setMyRegistration(myReg);
+      }
+      setLoading(false);
     };
+    load();
+  }, [id, session?.user?.id]);
 
-    setEvent(mockEvent);
-    setLoading(false);
-  }, [params.id]);
+  const handleRegister = async () => {
+    if (!session?.user) { router.push('/sign-in'); return; }
+    setRegistering(true);
+    try {
+      if (myRegistration) {
+        await deleteRegistration(myRegistration.id, id);
+        setMyRegistration(null);
+        setRegistrations((r) => r.filter((x) => x.id !== myRegistration.id));
+        setEvent((e) => e ? { ...e, participantCount: Math.max(0, e.participantCount - 1) } : e);
+        toast.success('Désinscription effectuée');
+      } else {
+        if (event?.maxParticipants && registrations.length >= event.maxParticipants) {
+          toast.error('Événement complet');
+          return;
+        }
+        const regId = await createRegistration({
+          eventId: id,
+          userId: session.user.id,
+          userName: session.user.name,
+          userAvatar: session.user.image || undefined,
+          registeredAt: new Date(),
+        });
+        if (regId) {
+          const reg: Registration = {
+            id: regId, eventId: id, userId: session.user.id,
+            userName: session.user.name, userAvatar: session.user.image || undefined,
+            registeredAt: new Date(),
+          };
+          setMyRegistration(reg);
+          setRegistrations((r) => [...r, reg]);
+          setEvent((e) => e ? { ...e, participantCount: e.participantCount + 1 } : e);
+          toast.success('Inscrit ! À bientôt 🎉');
+        }
+      }
+    } catch {
+      toast.error('Erreur lors de l\'opération');
+    } finally {
+      setRegistering(false);
+    }
+  };
 
-  const handleParticipate = () => {
-    // TODO: Implement participation logic
-    setIsParticipant(!isParticipant);
+  const handleComment = async (parentId?: string) => {
+    if (!session?.user) { router.push('/sign-in'); return; }
+    const text = parentId ? replyText : commentText;
+    if (!text.trim()) return;
+    setSubmittingComment(true);
+    try {
+      const commentId = await createComment({
+        eventId: id,
+        userId: session.user.id,
+        userName: session.user.name,
+        userAvatar: session.user.image || undefined,
+        text: text.trim(),
+        rating: parentId ? undefined : rating,
+        parentCommentId: parentId || null,
+        createdAt: new Date(),
+      });
+      if (commentId) {
+        const newComment: Comment = {
+          id: commentId, eventId: id, userId: session.user.id,
+          userName: session.user.name, userAvatar: session.user.image || undefined,
+          text: text.trim(), rating: parentId ? undefined : rating,
+          parentCommentId: parentId || null, createdAt: new Date(),
+        };
+        setComments((c) => [newComment, ...c]);
+        if (parentId) { setReplyText(''); setReplyTo(null); } else { setCommentText(''); setRating(5); }
+        toast.success('Commentaire ajouté !');
+      }
+    } catch {
+      toast.error('Erreur');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    await deleteComment(commentId);
+    setComments((c) => c.filter((x) => x.id !== commentId));
+    toast.success('Commentaire supprimé');
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-1 flex items-center justify-center">
-          <p>Chargement...</p>
-        </main>
-        <Footer />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-pulse text-muted-foreground">Chargement...</div>
+        </div>
       </div>
     );
   }
@@ -82,192 +153,253 @@ export default function EventDetailPage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-2">Événement introuvable</h1>
-            <Button onClick={() => router.push('/')}>
-              Retour à l'accueil
-            </Button>
+        <div className="flex-1 flex items-center justify-center text-center">
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Événement introuvable</h2>
+            <Link href="/"><Button><ArrowLeft className="h-4 w-4 mr-2" />Retour</Button></Link>
           </div>
-        </main>
+        </div>
         <Footer />
       </div>
     );
   }
 
-  const gradients = [
-    'gradient-purple',
-    'gradient-pink',
-    'gradient-orange',
-    'gradient-blue',
-    'gradient-green',
-  ];
-  
-  // Deterministic gradient selection based on event ID
-  const getGradientClass = (eventId: string): string => {
-    const hash = eventId.split('').reduce((acc, char) => {
-      return char.charCodeAt(0) + ((acc << 5) - acc);
-    }, 0);
-    return gradients[Math.abs(hash) % gradients.length];
-  };
-  
-  const gradientClass = getGradientClass(event.id);
+  const topComments = comments.filter((c) => !c.parentCommentId);
+  const replies = comments.filter((c) => c.parentCommentId);
+  const isFull = !!(event.maxParticipants && registrations.length >= event.maxParticipants);
+  const avgRating = topComments.filter((c) => c.rating).length > 0
+    ? topComments.filter((c) => c.rating).reduce((a, c) => a + (c.rating || 0), 0) / topComments.filter((c) => c.rating).length
+    : 0;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-
       <main className="flex-1">
-        {/* Hero Image */}
-        <div className={`h-64 md:h-96 ${event.imageUrl ? '' : gradientClass} relative`}>
-          {event.imageUrl ? (
-            <img
-              src={event.imageUrl}
-              alt={event.title}
-              className="w-full h-full object-cover"
-            />
-          ) : null}
+        {/* Cover */}
+        <div className="h-64 md:h-80 relative bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400">
+          {event.imageUrl && <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover absolute inset-0" />}
+          <div className="absolute inset-0 bg-black/30 flex items-end p-6">
+            <div className="text-white">
+              <Link href="/" className="flex items-center text-sm mb-3 opacity-80 hover:opacity-100">
+                <ArrowLeft className="h-4 w-4 mr-1" />Retour
+              </Link>
+              <span className="px-2 py-1 bg-white/20 rounded-full text-xs uppercase tracking-wider">{event.category}</span>
+              <h1 className="text-2xl md:text-4xl font-bold mt-2 drop-shadow">{event.title}</h1>
+            </div>
+          </div>
         </div>
 
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Header */}
-              <div>
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="text-sm font-semibold text-primary uppercase mb-2">
-                      {event.category}
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-bold mb-2">
-                      {event.title}
-                    </h1>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon">
-                      <Heart className="h-5 w-5" />
-                    </Button>
-                    <Button variant="ghost" size="icon">
-                      <Share2 className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Organizer */}
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white text-lg font-semibold">
-                    {event.organizerName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Organisé par</p>
-                    <p className="font-semibold">{event.organizerName}</p>
-                  </div>
-                </div>
-              </div>
-
+            <div className="md:col-span-2 space-y-6">
               {/* Description */}
               <Card>
-                <CardHeader>
-                  <CardTitle>À propos de l'événement</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground whitespace-pre-line">
-                    {event.description}
-                  </p>
+                <CardContent className="pt-6">
+                  <p className="text-muted-foreground leading-relaxed">{event.description}</p>
                 </CardContent>
               </Card>
 
-              {/* Tags */}
-              {event.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {event.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Comments */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5" />
+                    Avis & Commentaires
+                    {avgRating > 0 && (
+                      <span className="flex items-center gap-1 text-sm font-normal text-yellow-500">
+                        <Star className="h-4 w-4 fill-yellow-500" />{avgRating.toFixed(1)}
+                      </span>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Add comment */}
+                  {session?.user ? (
+                    <div className="space-y-3 p-4 bg-muted/30 rounded-xl">
+                      <div className="flex gap-1">
+                        {[1,2,3,4,5].map((s) => (
+                          <button key={s} type="button" onClick={() => setRating(s)}>
+                            <Star className={`h-5 w-5 ${s <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        placeholder="Laisse ton avis..."
+                        className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm resize-none h-20"
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                      />
+                      <Button size="sm" onClick={() => handleComment()} disabled={submittingComment || !commentText.trim()}>
+                        <Send className="h-4 w-4 mr-2" />Publier
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      <Link href="/sign-in" className="text-primary hover:underline">Connecte-toi</Link> pour laisser un avis
+                    </p>
+                  )}
+
+                  {/* Comments list */}
+                  {topComments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Sois le premier à donner ton avis !</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {topComments.map((comment) => {
+                        const commentReplies = replies.filter((r) => r.parentCommentId === comment.id);
+                        return (
+                          <div key={comment.id} className="border-b border-border/50 pb-4 last:border-0">
+                            <div className="flex items-start gap-3">
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                {comment.userName.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-sm">{comment.userName}</span>
+                                  {comment.rating && (
+                                    <div className="flex">{Array.from({length:comment.rating}).map((_,i) => <Star key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />)}</div>
+                                  )}
+                                  <span className="text-xs text-muted-foreground ml-auto">{formatDate(comment.createdAt)}</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{comment.text}</p>
+                                <div className="flex gap-3 mt-2">
+                                  {session?.user && (
+                                    <button className="text-xs text-primary hover:underline" onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}>
+                                      Répondre
+                                    </button>
+                                  )}
+                                  {session?.user?.id === comment.userId && (
+                                    <button className="text-xs text-destructive hover:underline" onClick={() => handleDeleteComment(comment.id)}>
+                                      <Trash2 className="h-3 w-3 inline mr-1" />Supprimer
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Reply input */}
+                                {replyTo === comment.id && (
+                                  <div className="mt-3 flex gap-2">
+                                    <input
+                                      className="flex-1 px-3 py-1.5 rounded-md border border-input bg-background text-sm"
+                                      placeholder="Répondre..."
+                                      value={replyText}
+                                      onChange={(e) => setReplyText(e.target.value)}
+                                    />
+                                    <Button size="sm" onClick={() => handleComment(comment.id)} disabled={submittingComment || !replyText.trim()}>
+                                      <Send className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {/* Replies */}
+                                {commentReplies.map((reply) => (
+                                  <div key={reply.id} className="mt-3 ml-4 flex items-start gap-2 border-l-2 border-primary/20 pl-3">
+                                    <div className="h-6 w-6 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                      {reply.userName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-0.5">
+                                        <span className="font-medium text-xs">{reply.userName}</span>
+                                        <span className="text-xs text-muted-foreground ml-auto">{formatDate(reply.createdAt)}</span>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">{reply.text}</p>
+                                      {session?.user?.id === reply.userId && (
+                                        <button className="text-xs text-destructive hover:underline mt-1" onClick={() => handleDeleteComment(reply.id)}>
+                                          <Trash2 className="h-3 w-3 inline mr-1" />Supprimer
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Participation Card */}
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    {/* Price */}
-                    <div className="text-center pb-4 border-b">
-                      {event.isFree ? (
-                        <div className="text-3xl font-bold text-green-600">
-                          Gratuit
-                        </div>
-                      ) : (
-                        <div className="text-3xl font-bold">{event.price} CHF</div>
-                      )}
-                    </div>
-
-                    {/* Participants */}
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Users className="h-5 w-5" />
-                      <span>
-                        {event.currentParticipants}
-                        {event.maxParticipants
-                          ? ` / ${event.maxParticipants}`
-                          : ''}{' '}
-                        participants
-                      </span>
-                    </div>
-
-                    {/* Action Button */}
-                    <Button
-                      className="w-full"
-                      size="lg"
-                      onClick={handleParticipate}
-                      variant={isParticipant ? 'outline' : 'default'}
-                    >
-                      {isParticipant ? 'Se désinscrire' : 'Participer'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
+            <div className="space-y-4">
               {/* Event Info */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Informations</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">{formatDate(event.date)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatTime(event.date)}
-                        {event.endDate && ` - ${formatTime(event.endDate)}`}
-                      </p>
-                    </div>
+                <CardContent className="pt-6 space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span>{formatDate(event.date)}</span>
                   </div>
-
-                  <div className="flex items-start gap-3">
-                    <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">{event.location.address}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {event.location.city}
-                      </p>
+                  {event.startTime && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-primary flex-shrink-0" />
+                      <span>{event.startTime}{event.endTime ? ` – ${event.endTime}` : ''}</span>
                     </div>
+                  )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span>{event.location}</span>
                   </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span>{event.participantCount}{event.maxParticipants ? ` / ${event.maxParticipants}` : ''} participants</span>
+                  </div>
+                  <div className="pt-2 border-t border-border/50">
+                    <span className="text-lg font-bold">
+                      {event.isFree ? <span className="text-green-500">Gratuit</span> : <span className="text-purple-600">{event.price} CHF</span>}
+                    </span>
+                  </div>
+                  <Button
+                    className={`w-full ${myRegistration ? 'bg-muted text-foreground hover:bg-destructive/10 hover:text-destructive border border-border' : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0'}`}
+                    onClick={handleRegister}
+                    disabled={registering || (isFull && !myRegistration)}
+                  >
+                    {registering ? 'En cours...' : myRegistration ? (
+                      <><UserMinus className="h-4 w-4 mr-2" />Se désinscrire</>
+                    ) : isFull ? 'Complet' : (
+                      <><UserCheck className="h-4 w-4 mr-2" />S'inscrire</>
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
+
+              {/* Organizer */}
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Organisateur</CardTitle></CardHeader>
+                <CardContent>
+                  <Link href={`/profile/${event.organizerId}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold">
+                      {event.organizerName.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="font-medium text-sm">{event.organizerName}</span>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              {/* Participants */}
+              {registrations.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">Participants ({registrations.length})</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {registrations.slice(0, 10).map((r) => (
+                        <div key={r.id} title={r.userName} className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-xs font-bold">
+                          {r.userName.charAt(0).toUpperCase()}
+                        </div>
+                      ))}
+                      {registrations.length > 10 && (
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                          +{registrations.length - 10}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>
       </main>
-
       <Footer />
     </div>
   );

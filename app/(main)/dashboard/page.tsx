@@ -1,233 +1,185 @@
 'use client';
 
-import { useState } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Calendar,
-  Users,
-  Star,
-  TrendingUp,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-} from 'lucide-react';
-import type { Event, DashboardStats } from '@/types';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
+import { Plus, Trash2, Edit, Copy, Users, Star, Calendar, BarChart3 } from 'lucide-react';
+import { useSession } from '@/lib/auth-client';
+import { getUserEvents, deleteEvent, createEvent, getEventComments } from '@/lib/db';
+import type { Event } from '@/types';
 import { formatDate } from '@/lib/utils';
 
 export default function DashboardPage() {
-  // Mock data
-  const stats: DashboardStats = {
-    totalEvents: 12,
-    activeEvents: 5,
-    totalParticipants: 347,
-    averageRating: 4.5,
-    upcomingEvents: 3,
-    completedEvents: 7,
+  const { data: session } = useSession();
+  const router = useRouter();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!session?.user) { setLoading(false); return; }
+    const load = async () => {
+      const evs = await getUserEvents(session.user.id);
+      setEvents(evs);
+      const counts: Record<string, number> = {};
+      const avgs: Record<string, number> = {};
+      await Promise.all(evs.map(async (e) => {
+        const comms = await getEventComments(e.id);
+        counts[e.id] = comms.length;
+        const rated = comms.filter((c) => c.rating);
+        avgs[e.id] = rated.length > 0 ? rated.reduce((a, c) => a + (c.rating || 0), 0) / rated.length : 0;
+      }));
+      setCommentCounts(counts);
+      setRatings(avgs);
+      setLoading(false);
+    };
+    load();
+  }, [session?.user?.id]);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Supprimer cet événement ?')) return;
+    await deleteEvent(id);
+    setEvents((e) => e.filter((x) => x.id !== id));
+    toast.success('Événement supprimé');
   };
 
-  const myEvents: Event[] = [
-    {
-      id: '1',
-      title: 'Festival de Musique Électronique',
-      description: 'Une soirée inoubliable',
-      date: new Date('2026-03-15T20:00:00'),
-      location: { address: 'Rue du Lac 15', city: 'Lausanne' },
-      organizerId: 'me',
-      organizerName: 'Moi',
-      category: 'music',
-      tags: [],
-      currentParticipants: 87,
-      maxParticipants: 200,
-      visibility: 'public',
-      isFree: false,
-      price: 25,
-      status: 'published',
-      participants: [],
+  const handleDuplicate = async (event: Event) => {
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = event;
+    const newId = await createEvent({
+      ...rest,
+      title: `${event.title} (copie)`,
+      participantCount: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      title: 'Brunch Networking',
-      description: 'Rencontrez des entrepreneurs',
-      date: new Date('2026-03-18T10:00:00'),
-      location: { address: 'Café du Commerce', city: 'Genève' },
-      organizerId: 'me',
-      organizerName: 'Moi',
-      category: 'networking',
-      tags: [],
-      currentParticipants: 28,
-      maxParticipants: 40,
-      visibility: 'public',
-      isFree: false,
-      price: 20,
-      status: 'published',
-      participants: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ];
+    });
+    if (newId) {
+      toast.success('Événement dupliqué !');
+      router.push(`/events/${newId}`);
+    }
+  };
+
+  if (!session?.user) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center text-center p-4">
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Connexion requise</h2>
+            <Link href="/sign-in"><Button>Se connecter</Button></Link>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const totalParticipants = events.reduce((a, e) => a + e.participantCount, 0);
+  const avgRating = events.length > 0 && Object.values(ratings).some((r) => r > 0)
+    ? Object.values(ratings).filter((r) => r > 0).reduce((a, r) => a + r, 0) / Object.values(ratings).filter((r) => r > 0).length
+    : 0;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-
       <main className="flex-1 py-8 px-4">
-        <div className="container mx-auto">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-              <p className="text-muted-foreground">
-                Gérez vos événements et suivez vos statistiques
-              </p>
-            </div>
-            <Link href="/events/create">
-              <Button size="lg" className="mt-4 md:mt-0">
-                <Plus className="h-4 w-4 mr-2" />
-                Créer un événement
-              </Button>
-            </Link>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Total événements
-                    </p>
-                    <p className="text-3xl font-bold">{stats.totalEvents}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-purple-500/10 flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Événements actifs
-                    </p>
-                    <p className="text-3xl font-bold">{stats.activeEvents}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Total participants
-                    </p>
-                    <p className="text-3xl font-bold">{stats.totalParticipants}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
-                    <Users className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Note moyenne
-                    </p>
-                    <p className="text-3xl font-bold">{stats.averageRating}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                    <Star className="h-6 w-6 text-yellow-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Events Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Mes événements</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {myEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex-1 mb-4 md:mb-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold">{event.title}</h3>
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full ${
-                            event.status === 'published'
-                              ? 'bg-green-500/10 text-green-600'
-                              : 'bg-gray-500/10 text-gray-600'
-                          }`}
-                        >
-                          {event.status}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {formatDate(event.date)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          {event.currentParticipants}
-                          {event.maxParticipants
-                            ? ` / ${event.maxParticipants}`
-                            : ''}{' '}
-                          participants
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Link href={`/events/${event.id}`}>
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4 mr-2" />
-                          Voir
-                        </Button>
-                      </Link>
-                      <Link href={`/events/${event.id}/edit`}>
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4 mr-2" />
-                          Modifier
-                        </Button>
-                      </Link>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+        <div className="container mx-auto max-w-5xl">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  Dashboard 📊
+                </h1>
+                <p className="text-muted-foreground mt-1">Gère tes événements</p>
               </div>
-            </CardContent>
-          </Card>
+              <Link href="/events/create">
+                <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0">
+                  <Plus className="h-4 w-4 mr-2" />Créer
+                </Button>
+              </Link>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: 'Événements', value: events.length, icon: Calendar, color: 'from-purple-500 to-purple-600' },
+                { label: 'Participants', value: totalParticipants, icon: Users, color: 'from-pink-500 to-pink-600' },
+                { label: 'Note moy.', value: avgRating > 0 ? avgRating.toFixed(1) : '–', icon: Star, color: 'from-orange-500 to-orange-600' },
+                { label: 'Commentaires', value: Object.values(commentCounts).reduce((a, c) => a + c, 0), icon: BarChart3, color: 'from-blue-500 to-blue-600' },
+              ].map((stat) => (
+                <Card key={stat.label} className="border-border/50">
+                  <CardContent className="pt-4 pb-4">
+                    <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3`}>
+                      <stat.icon className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="text-2xl font-bold">{stat.value}</div>
+                    <div className="text-xs text-muted-foreground">{stat.label}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Events Table */}
+            <Card className="border-border/50">
+              <CardHeader><CardTitle>Mes événements</CardTitle></CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-3">
+                    {Array.from({length:3}).map((_,i) => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)}
+                  </div>
+                ) : events.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Calendar className="h-12 w-12 mx-auto mb-3 opacity-40" />
+                    <p>Tu n'as pas encore créé d'événement</p>
+                    <Link href="/events/create">
+                      <Button className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0" size="sm">
+                        <Plus className="h-4 w-4 mr-2" />Créer mon premier événement
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {events.map((event) => (
+                      <div key={event.id} className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <Link href={`/events/${event.id}`} className="font-medium text-sm hover:text-primary line-clamp-1">{event.title}</Link>
+                          <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(event.date)}</span>
+                            <span className="flex items-center gap-1"><Users className="h-3 w-3" />{event.participantCount} inscrits</span>
+                            {commentCounts[event.id] > 0 && <span>{commentCounts[event.id]} avis</span>}
+                            {ratings[event.id] > 0 && (
+                              <span className="flex items-center gap-1 text-yellow-500"><Star className="h-3 w-3 fill-yellow-500" />{ratings[event.id].toFixed(1)}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Link href={`/events/${event.id}/edit`}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8"><Edit className="h-4 w-4" /></Button>
+                          </Link>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDuplicate(event)}>
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(event.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
       </main>
-
       <Footer />
     </div>
   );
