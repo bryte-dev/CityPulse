@@ -141,9 +141,11 @@ function PricingContent() {
                     >
                       {loading ? 'Redirection...' : 'S\'abonner au plan Pro'}
                     </Button>
-                    <p className="text-xs text-center text-muted-foreground">
-                      Mode test : carte <code className="font-mono bg-muted px-1 py-0.5 rounded">4242 4242 4242 4242</code>
-                    </p>
+                    {process.env.NODE_ENV === 'development' && (
+                      <p className="text-xs text-center text-muted-foreground">
+                        Mode test : carte <code className="font-mono bg-muted px-1 py-0.5 rounded">4242 4242 4242 4242</code>
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>

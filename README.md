@@ -1,304 +1,238 @@
-# 🎉 CityPulse
+# CityPulse 🎉
 
-**Découvrez, créez et participez aux meilleurs événements de votre ville !**
+**CityPulse** est une plateforme web dédiée à la découverte, création et participation à des événements locaux, pensée pour les jeunes (16–25 ans).
 
-CityPulse est une plateforme web moderne dédiée à la découverte et à la création d'événements locaux, pensée principalement pour les jeunes (16–25 ans). L'objectif est de répondre simplement à la question « On fait quoi ? » en centralisant toutes les sorties locales, y compris les petits événements spontanés souvent invisibles sur les réseaux sociaux classiques.
+## 🚀 Stack Technique
 
-![CityPulse Banner](https://via.placeholder.com/1200x400/7c3aed/ffffff?text=CityPulse)
+| Couche | Technologie |
+|--------|-------------|
+| Frontend | Next.js 15 (App Router) + TypeScript |
+| Styles | Tailwind CSS + shadcn/ui |
+| Animations | Framer Motion |
+| Base de données | Firebase Firestore |
+| Upload images | Cloudinary |
+| Authentification | Better-Auth |
+| Paiement | Stripe (mode test) |
+| Publicités | Google AdSense |
+| Déploiement | Vercel-ready |
 
 ## ✨ Fonctionnalités
 
-### Pour les Participants
-- 🔍 **Découverte d'événements** : Parcourez tous les événements locaux avec filtres avancés (date, lieu, catégorie, prix)
-- 🎫 **Participation en un clic** : Inscrivez-vous facilement aux événements qui vous intéressent
-- 💬 **Interaction sociale** : Commentez, notez et discutez avec d'autres participants
-- 📱 **Notifications** : Recevez des alertes pour les modifications d'événements
-- 👤 **Profil personnalisé** : Gérez votre profil et consultez votre historique
+- 🔐 **Authentification** : Inscription/connexion email + Google OAuth
+- 📅 **Événements** : Création, modification, suppression avec upload Cloudinary
+- 🏠 **Découverte** : Filtres (catégorie, date, prix), recherche, tri, vues grille/liste
+- 👆 **Inscriptions** : Inscription/désinscription en temps réel
+- 💬 **Commentaires** : Avis avec notation (1-5 ⭐) et réponses imbriquées
+- 👤 **Profil** : Gestion profil, événements créés, participations
+- 📊 **Dashboard** : Stats organisateur, gestion événements
+- 💳 **Paiement** : Plan Pro via Stripe (2 CHF/mois)
+- 🎯 **Publicités** : AdSense avec placeholders
+- 🌙 **Dark mode** : Persisté dans localStorage
+- 📱 **Responsive** : Mobile-first
 
-### Pour les Organisateurs
-- ✏️ **Création d'événements** : Créez des événements publics ou privés en quelques minutes
-- 📊 **Dashboard complet** : Suivez vos statistiques (participants, taux de participation, avis)
-- 👥 **Gestion des participants** : Gérez les inscriptions et invitations
-- 💰 **Événements gratuits ou payants** : Définissez vos propres tarifs
-- 📸 **Upload d'images** : Personnalisez vos événements avec des visuels attractifs
-
-## 🛠 Stack Technique
-
-- **Frontend** : [Next.js 14+](https://nextjs.org/) (App Router) avec TypeScript
-- **Styling** : [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
-- **Backend & BDD** : [Firebase](https://firebase.google.com/) (Firestore, Storage, Cloud Messaging)
-- **Authentification** : [Better-Auth](https://better-auth.com/)
-- **Hébergement** : Prêt pour [Vercel](https://vercel.com/)
-
-## 📁 Structure du Projet
-
-```
-CityPulse/
-├── app/
-│   ├── (auth)/                  # Pages d'authentification
-│   │   ├── login/
-│   │   ├── register/
-│   │   └── forgot-password/
-│   ├── (main)/                  # Pages principales
-│   │   ├── page.tsx             # Home / Découverte
-│   │   ├── events/
-│   │   │   ├── [id]/           # Détail événement
-│   │   │   └── create/         # Créer un événement
-│   │   ├── dashboard/          # Espace organisateur
-│   │   ├── profile/            # Profil utilisateur
-│   │   └── pricing/            # Page tarifs
-│   ├── api/
-│   │   └── auth/[...all]/      # API Better-Auth
-│   ├── layout.tsx
-│   └── globals.css
-├── components/
-│   ├── ui/                     # Composants shadcn/ui
-│   ├── events/                 # Composants événements
-│   ├── layout/                 # Layout (Navbar, Footer)
-│   └── auth/                   # Composants auth
-├── lib/
-│   ├── firebase.ts             # Configuration Firebase
-│   ├── auth.ts                 # Configuration Better-Auth
-│   ├── db.ts                   # Helpers Firestore
-│   └── utils.ts                # Utilitaires
-├── types/
-│   └── index.ts                # Types TypeScript
-└── public/
-```
-
-## 🚀 Installation et Setup
-
-### Prérequis
-
-- Node.js 18+ et npm
-- Un compte [Firebase](https://firebase.google.com/)
-- Un compte [Vercel](https://vercel.com/) (pour le déploiement)
-
-### 1. Cloner le repository
+## 🔧 Installation
 
 ```bash
-git clone https://github.com/bryte-dev/CityPulse.git
-cd CityPulse
-```
+# 1. Cloner le repo
+git clone <repo-url>
+cd citypulse
 
-### 2. Installer les dépendances
-
-```bash
+# 2. Installer les dépendances
 npm install
-```
 
-### 3. Configuration Firebase
-
-#### a) Créer un projet Firebase
-
-1. Allez sur [Firebase Console](https://console.firebase.google.com/)
-2. Cliquez sur "Ajouter un projet"
-3. Suivez les étapes de création
-
-#### b) Activer Firestore
-
-1. Dans votre projet Firebase, allez dans "Firestore Database"
-2. Cliquez sur "Créer une base de données"
-3. Choisissez le mode "test" pour commencer (⚠️ n'oubliez pas de configurer les règles de sécurité plus tard)
-4. Sélectionnez une région proche de vos utilisateurs
-
-#### c) Activer Firebase Storage
-
-1. Allez dans "Storage"
-2. Cliquez sur "Commencer"
-3. Acceptez les règles par défaut
-
-#### d) Activer Firebase Authentication
-
-1. Allez dans "Authentication"
-2. Cliquez sur "Commencer"
-3. Activez les méthodes de connexion souhaitées (Email/Mot de passe, Google, GitHub)
-
-#### e) Récupérer les clés de configuration
-
-1. Allez dans les paramètres du projet (⚙️)
-2. Dans "Vos applications", créez une application web
-3. Copiez les clés de configuration
-
-### 4. Configurer les variables d'environnement
-
-Créez un fichier `.env.local` à la racine du projet :
-
-```bash
+# 3. Configurer les variables d'environnement
 cp .env.example .env.local
+# Remplir .env.local avec vos clés (voir ci-dessous)
+
+# 4. Lancer en développement
+npm run dev
 ```
 
-Remplissez les variables avec vos clés Firebase :
+Ouvrir [http://localhost:3000](http://localhost:3000)
+
+## 🔑 Variables d'environnement
+
+Copier `.env.example` en `.env.local` et remplir :
 
 ```env
 # Firebase
-NEXT_PUBLIC_FIREBASE_API_KEY=votre_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=votre_projet.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=votre_projet_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=votre_projet.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=votre_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=votre_app_id
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+
+# Cloudinary
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 
 # Better-Auth
-BETTER_AUTH_SECRET=une_cle_secrete_longue_et_aleatoire
+BETTER_AUTH_SECRET=    # Générer : openssl rand -base64 32
 BETTER_AUTH_URL=http://localhost:3000
 
 # Google OAuth (optionnel)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
-# GitHub OAuth (optionnel)
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
+# Stripe
+STRIPE_SECRET_KEY=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# Google AdSense (optionnel)
+NEXT_PUBLIC_ADSENSE_CLIENT_ID=
 ```
 
-### 5. Configurer les règles Firestore
+## 🔥 Setup Firebase
 
-Dans Firebase Console > Firestore Database > Règles, ajoutez :
+1. Aller sur [console.firebase.google.com](https://console.firebase.google.com)
+2. Créer un projet (ou utiliser `citypulse-81660`)
+3. **Activer Firestore** : Build → Firestore Database → Create database
+4. **Activer Authentication** : Build → Authentication → Sign-in method
+   - Activer **Email/Password**
+   - Activer **Google** (nécessite Google Client ID/Secret)
+5. **Récupérer les clés** : Project Settings → Your apps → Add app (Web) → Copy config
+6. **Règles Firestore** recommandées :
 
-```javascript
+```firestore
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Events
+    // Events: lecture publique, écriture authentifiée
     match /events/{eventId} {
-      allow read: if true;
+      allow read: if resource.data.visibility == 'public' || request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        request.auth.uid == resource.data.organizerId;
+      allow update, delete: if request.auth.uid == resource.data.organizerId;
     }
-    
+    // Registrations
+    match /registrations/{regId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow delete: if request.auth.uid == resource.data.userId;
+    }
     // Comments
     match /comments/{commentId} {
       allow read: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
+      allow delete: if request.auth.uid == resource.data.userId;
     }
-    
-    // Chat Messages
-    match /chatMessages/{messageId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-    }
-    
     // Users
     match /users/{userId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth.uid == userId;
     }
   }
 }
 ```
 
-### 6. Configurer les règles Storage
+## ☁️ Setup Cloudinary
 
-Dans Firebase Console > Storage > Règles, ajoutez :
+1. Créer un compte sur [cloudinary.com](https://cloudinary.com)
+2. Dashboard → Settings → Upload presets
+3. Créer un **Upload Preset** nommé `citypulse_events` (mode Unsigned)
+4. Récupérer le **Cloud Name** dans le Dashboard
+5. Remplir `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` dans `.env.local`
+6. Pour les webhooks serveur : récupérer **API Key** et **API Secret**
 
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /events/{eventId}/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null && 
-        request.resource.size < 5 * 1024 * 1024 && 
-        request.resource.contentType.matches('image/.*');
-    }
-    
-    match /avatars/{userId}/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null && 
-        request.auth.uid == userId &&
-        request.resource.size < 2 * 1024 * 1024 && 
-        request.resource.contentType.matches('image/.*');
-    }
-  }
-}
+## 🔐 Setup Better-Auth
+
+1. Générer un secret : `openssl rand -base64 32`
+2. Remplir `BETTER_AUTH_SECRET` dans `.env.local`
+3. Pour Google OAuth :
+   - Aller sur [console.cloud.google.com](https://console.cloud.google.com)
+   - Créer des credentials OAuth 2.0
+   - Ajouter `http://localhost:3000/api/auth/callback/google` comme redirect URI
+   - Copier Client ID et Client Secret
+
+## 💳 Setup Stripe (mode test)
+
+1. Créer un compte sur [stripe.com](https://stripe.com)
+2. Dashboard → Developers → API keys
+3. Copier **Publishable key** (`pk_test_...`) et **Secret key** (`sk_test_...`)
+4. **Créer un produit** : Products → Add product
+   - Nom : "CityPulse Pro"
+   - Prix : 2 CHF/mois (recurring)
+   - Copier le **Price ID** (`price_...`)
+   - Ajouter dans `.env.local` : `NEXT_PUBLIC_STRIPE_PRICE_ID=price_...`
+5. **Webhook local** (développement) :
+   ```bash
+   stripe listen --forward-to localhost:3000/api/stripe/webhook
+   ```
+   Copier le webhook secret (`whsec_...`) dans `STRIPE_WEBHOOK_SECRET`
+6. **Carte test** : `4242 4242 4242 4242`, n'importe quelle date future, n'importe quel CVC
+
+## 📢 Setup Google AdSense (optionnel)
+
+1. S'inscrire sur [adsense.google.com](https://adsense.google.com)
+2. Une fois approuvé, récupérer le **Publisher ID** (`ca-pub-XXXXXXXXXXXXXXXX`)
+3. Remplir `NEXT_PUBLIC_ADSENSE_CLIENT_ID=ca-pub-XXXXXXXXXXXXXXXX`
+4. Sans cette variable, des placeholders stylés s'affichent automatiquement
+
+## 🏗️ Structure Firestore
+
+```
+users/{userId}
+  email, name, avatar, bio, role, stripeCustomerId, subscriptionStatus, createdAt, updatedAt
+
+events/{eventId}
+  title, description, date, startTime, endTime, location, category
+  organizerId, organizerName, maxParticipants, participantCount
+  visibility, price, isFree, imageUrl, sponsored, createdAt, updatedAt
+
+registrations/{registrationId}
+  eventId, userId, userName, userAvatar, registeredAt
+
+comments/{commentId}
+  eventId, userId, userName, userAvatar, text, rating, parentCommentId, createdAt
 ```
 
-### 7. Lancer l'application en développement
+## 🚀 Déploiement Vercel
+
+1. Pousser le code sur GitHub
+2. Importer le repo dans [vercel.com](https://vercel.com)
+3. Configurer les variables d'environnement dans Vercel Dashboard
+4. Mettre à jour `BETTER_AUTH_URL` avec l'URL de production
+5. Mettre à jour les redirect URIs OAuth et Stripe webhooks
 
 ```bash
-npm run dev
+# Build de production
+npm run build
+npm start
 ```
 
-Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur.
+## 📁 Structure du projet
 
-## 🌐 Déploiement sur Vercel
-
-### 1. Préparer le déploiement
-
-Assurez-vous que votre projet est sur GitHub :
-
-```bash
-git add .
-git commit -m "Ready for deployment"
-git push origin main
 ```
-
-### 2. Déployer sur Vercel
-
-1. Allez sur [vercel.com](https://vercel.com/)
-2. Cliquez sur "New Project"
-3. Importez votre repository GitHub
-4. Configurez les variables d'environnement (copiez depuis `.env.local`)
-5. Cliquez sur "Deploy"
-
-### 3. Mettre à jour Better-Auth URL
-
-Une fois déployé, mettez à jour la variable `BETTER_AUTH_URL` avec l'URL de votre application Vercel :
-
-```env
-BETTER_AUTH_URL=https://votre-app.vercel.app
+app/
+  (auth)/          # Pages d'authentification
+    login/
+    register/
+    forgot-password/
+  (main)/          # Pages principales
+    page.tsx         # Accueil / Découverte
+    events/
+      create/        # Création événement
+      [id]/          # Détail événement
+    dashboard/       # Dashboard organisateur
+    profile/         # Profil utilisateur
+      [userId]/      # Profil public
+    pricing/         # Plans tarifaires
+  api/
+    auth/            # Better-Auth handler
+    stripe/          # Stripe checkout + webhook
+components/
+  ads/             # AdBanner
+  events/          # EventCard, EventFilters, EventList
+  layout/          # Navbar, Footer
+  providers/       # ThemeProvider
+  ui/              # shadcn/ui components
+lib/
+  auth.ts          # Configuration Better-Auth
+  auth-client.ts   # Client Better-Auth
+  db.ts            # Opérations Firestore
+  firebase.ts      # Configuration Firebase
+  utils.ts         # Utilitaires
+types/             # Types TypeScript
 ```
-
-## 🎨 Design & UI/UX
-
-- **Couleurs** : Dégradés vibrants (violet, rose, orange) adaptés aux jeunes
-- **Typography** : Police Inter pour une lecture moderne
-- **Mobile-first** : Entièrement responsive sur tous les appareils
-- **Dark mode** : Support du mode sombre intégré
-- **Animations** : Transitions douces avec Framer Motion
-
-## 🔐 Sécurité
-
-- Authentification sécurisée avec Better-Auth
-- Validation des données côté serveur
-- Protection des routes sensibles
-- Règles Firebase strictes
-- Gestion des rôles (participant / organisateur / admin)
-
-## 📱 Fonctionnalités à venir
-
-- [ ] Notifications push avec Firebase Cloud Messaging
-- [ ] Intégration de cartes interactives (Google Maps)
-- [ ] Système de recommandations basé sur les préférences
-- [ ] Export des événements au format iCal
-- [ ] Application mobile (React Native)
-- [ ] Mode hors ligne (PWA)
-
-## 🤝 Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
-
-1. Fork le projet
-2. Créez votre branche (`git checkout -b feature/AmazingFeature`)
-3. Committez vos changements (`git commit -m 'Add some AmazingFeature'`)
-4. Pushez vers la branche (`git push origin feature/AmazingFeature`)
-5. Ouvrez une Pull Request
-
-## 📄 Licence
-
-Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
-
-## 📧 Contact
-
-Pour toute question ou suggestion, n'hésitez pas à nous contacter :
-
-- Email : contact@citypulse.ch
-- Twitter : [@CityPulse](https://twitter.com/citypulse)
-
----
-
-Fait avec ❤️ pour la communauté suisse

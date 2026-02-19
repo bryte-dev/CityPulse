@@ -167,8 +167,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const topComments = comments.filter((c) => !c.parentCommentId);
   const replies = comments.filter((c) => c.parentCommentId);
   const isFull = !!(event.maxParticipants && registrations.length >= event.maxParticipants);
-  const avgRating = topComments.filter((c) => c.rating).length > 0
-    ? topComments.filter((c) => c.rating).reduce((a, c) => a + (c.rating || 0), 0) / topComments.filter((c) => c.rating).length
+  const ratedComments = topComments.filter((c) => c.rating);
+  const avgRating = ratedComments.length > 0
+    ? ratedComments.reduce((a, c) => a + (c.rating || 0), 0) / ratedComments.length
     : 0;
 
   return (

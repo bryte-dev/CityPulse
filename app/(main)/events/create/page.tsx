@@ -80,7 +80,9 @@ export default function CreateEventPage() {
       }
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('upload_preset', 'citypulse_events');
+      // Upload preset must be created in Cloudinary as an unsigned preset
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'citypulse_events';
+      formData.append('upload_preset', uploadPreset);
       formData.append('folder', 'citypulse/events');
       const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST',
