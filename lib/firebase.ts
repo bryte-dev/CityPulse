@@ -1,6 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { getAuth, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -12,22 +11,33 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-let app: FirebaseApp;
-let db: Firestore;
-let storage: FirebaseStorage;
-let auth: Auth;
-
-if (typeof window !== 'undefined') {
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApps()[0];
-  }
-  
-  db = getFirestore(app);
-  storage = getStorage(app);
-  auth = getAuth(app);
+function getFirebaseApp(): FirebaseApp {
+  if (getApps().length > 0) return getApps()[0];
+  return initializeApp(firebaseConfig);
 }
 
-export { app, db, storage, auth };
+// Lazy getters to avoid initialization at module load time
+let _app: FirebaseApp | undefined;
+let _db: Firestore | undefined;
+let _auth: Auth | undefined;
+
+export function getFirebaseDb(): Firestore {
+  if (!_db) {
+    if (!_app) _app = getFirebaseApp();
+    _db = getFirestore(_app);
+  }
+  return _db;
+}
+
+export function getFirebaseAuth(): Auth {
+  if (!_auth) {
+    if (!_app) _app = getFirebaseApp();
+    _auth = getAuth(_app);
+  }
+  return _auth;
+}
+
+// Backward compat exports (only used client-side)
+export const app = typeof window !== 'undefined' ? getFirebaseApp() : undefined;
+export const db = typeof window !== 'undefined' ? getFirebaseDb() : undefined as unknown as Firestore;
+export const auth = typeof window !== 'undefined' ? getFirebaseAuth() : undefined as unknown as Auth;

@@ -3,191 +3,127 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar, Mail, Lock, User, Chrome } from 'lucide-react';
+import { signUp, signIn } from '@/lib/auth-client';
+
+const schema = z.object({
+  name: z.string().min(2, 'Nom trop court'),
+  email: z.string().email('Email invalide'),
+  password: z.string().min(8, 'Minimum 8 caractères'),
+  confirmPassword: z.string(),
+}).refine((d) => d.password === d.confirmPassword, { message: 'Les mots de passe ne correspondent pas', path: ['confirmPassword'] });
+
+type FormData = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'participant' as 'participant' | 'organizer',
-  });
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (formData.password !== formData.confirmPassword) {
-      alert('Les mots de passe ne correspondent pas');
-      return;
-    }
-    
+  const onSubmit = async (data: FormData) => {
     setLoading(true);
-    
-    // TODO: Implement Better-Auth registration
-    console.log('Register:', formData);
-    
-    setTimeout(() => {
+    try {
+      const result = await signUp.email({ email: data.email, password: data.password, name: data.name });
+      if (result.error) {
+        toast.error(result.error.message || 'Erreur lors de l\'inscription');
+      } else {
+        toast.success('Compte créé ! Bienvenue sur CityPulse 🎉');
+        router.push('/');
+      }
+    } catch {
+      toast.error('Une erreur est survenue');
+    } finally {
       setLoading(false);
-      router.push('/');
-    }, 1000);
+    }
+  };
+
+  const handleGoogle = async () => {
+    try {
+      await signIn.social({ provider: 'google', callbackURL: '/' });
+    } catch {
+      toast.error('Erreur lors de la connexion Google');
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <Link href="/" className="flex items-center justify-center space-x-2 mb-4">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 dark:from-purple-950/20 dark:via-pink-950/20 dark:to-orange-950/20 p-4">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+        <div className="flex justify-center mb-6">
+          <Link href="/" className="flex items-center space-x-2">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
               <Calendar className="h-6 w-6 text-white" />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              CityPulse
-            </span>
+            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">CityPulse</span>
           </Link>
-          <CardTitle className="text-2xl">Inscription</CardTitle>
-          <CardDescription>
-            Créez votre compte pour commencer à participer
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nom complet</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Jean Dupont"
-                required
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="votre@email.com"
-                required
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                required
-                minLength={8}
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                required
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  setFormData({ ...formData, confirmPassword: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Type de compte</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  className={`p-4 border rounded-lg text-center transition-colors ${
-                    formData.role === 'participant'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-input hover:bg-accent'
-                  }`}
-                  onClick={() =>
-                    setFormData({ ...formData, role: 'participant' })
-                  }
-                >
-                  <div className="font-semibold mb-1">Participant</div>
-                  <div className="text-xs text-muted-foreground">
-                    Gratuit
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  className={`p-4 border rounded-lg text-center transition-colors ${
-                    formData.role === 'organizer'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-input hover:bg-accent'
-                  }`}
-                  onClick={() =>
-                    setFormData({ ...formData, role: 'organizer' })
-                  }
-                >
-                  <div className="font-semibold mb-1">Organisateur</div>
-                  <div className="text-xs text-muted-foreground">
-                    2 CHF/mois
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Inscription...' : 'S\'inscrire'}
+        </div>
+        <Card className="shadow-xl border-border/50">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Rejoins la communauté ! 🚀</CardTitle>
+            <CardDescription>Crée ton compte pour découvrir les événements</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button variant="outline" className="w-full" onClick={handleGoogle} type="button">
+              <Chrome className="h-4 w-4 mr-2" />Continuer avec Google
             </Button>
-          </form>
-
-          <div className="mt-6">
             <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Ou continuer avec
-                </span>
+                <span className="bg-background px-2 text-muted-foreground">ou</span>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <Button variant="outline" type="button">
-                Google
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <Label htmlFor="name">Nom d'utilisateur</Label>
+                <div className="relative mt-1">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input id="name" placeholder="Ton prénom ou pseudo" className="pl-9" {...register('name')} />
+                </div>
+                {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <div className="relative mt-1">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input id="email" type="email" placeholder="toi@exemple.com" className="pl-9" {...register('email')} />
+                </div>
+                {errors.email && <p className="text-xs text-destructive mt-1">{errors.email.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="password">Mot de passe</Label>
+                <div className="relative mt-1">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input id="password" type="password" placeholder="Min. 8 caractères" className="pl-9" {...register('password')} />
+                </div>
+                {errors.password && <p className="text-xs text-destructive mt-1">{errors.password.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+                <div className="relative mt-1">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input id="confirmPassword" type="password" placeholder="••••••••" className="pl-9" {...register('confirmPassword')} />
+                </div>
+                {errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword.message}</p>}
+              </div>
+              <Button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0" disabled={loading}>
+                {loading ? 'Création...' : 'Créer mon compte'}
               </Button>
-              <Button variant="outline" type="button">
-                GitHub
-              </Button>
-            </div>
-          </div>
-
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            Vous avez déjà un compte ?{' '}
-            <Link href="/login" className="text-primary hover:underline font-semibold">
-              Se connecter
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+            </form>
+            <p className="text-center text-sm text-muted-foreground">
+              Déjà un compte ?{' '}
+              <Link href="/login" className="text-primary font-medium hover:underline">Se connecter</Link>
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

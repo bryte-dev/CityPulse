@@ -1,349 +1,307 @@
 'use client';
 
-import { useState } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, MapPin, Upload, Plus, X } from 'lucide-react';
-import type { CreateEventFormData, EventCategory } from '@/types';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
+import { ImageIcon, Loader2, Upload } from 'lucide-react';
+import { useSession } from '@/lib/auth-client';
+import { createEvent } from '@/lib/db';
+import type { EventCategory } from '@/types';
+
+const schema = z.object({
+  title: z.string().min(3, 'Titre trop court'),
+  description: z.string().min(10, 'Description trop courte'),
+  date: z.string().min(1, 'Date requise'),
+  startTime: z.string().min(1, 'Heure de début requise'),
+  endTime: z.string().optional(),
+  location: z.string().min(3, 'Lieu requis'),
+  category: z.enum(['music','sport','culture','gaming','food','party','outdoor','networking','education','other']),
+  maxParticipants: z.string().optional(),
+  visibility: z.enum(['public','private']),
+  isFree: z.boolean(),
+  price: z.string().optional(),
+});
+
+type FormData = z.infer<typeof schema>;
 
 export default function CreateEventPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<Partial<CreateEventFormData>>({
-    isFree: true,
-    visibility: 'public',
-    category: 'other',
-    tags: [],
+  const { data: session } = useSession();
+  const [imageUrl, setImageUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { visibility: 'public', isFree: true, category: 'other' },
   });
-  const [tagInput, setTagInput] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    // TODO: Implement actual event creation with Firebase
-    console.log('Creating event:', formData);
-    
-    setTimeout(() => {
-      setLoading(false);
-      router.push('/dashboard');
-    }, 1000);
-  };
+  const isFree = watch('isFree');
 
-  const addTag = () => {
-    if (tagInput && !formData.tags?.includes(tagInput)) {
-      setFormData({
-        ...formData,
-        tags: [...(formData.tags || []), tagInput],
+  if (!session?.user) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-4">Connexion requise</h2>
+            <p className="text-muted-foreground mb-6">Tu dois être connecté pour créer un événement</p>
+            <Link href="/sign-in"><Button>Se connecter</Button></Link>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      if (!cloudName) {
+        toast.error('Configuration Cloudinary manquante');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      // Upload preset must be created in Cloudinary as an unsigned preset
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'citypulse_events';
+      formData.append('upload_preset', uploadPreset);
+      formData.append('folder', 'citypulse/events');
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData,
       });
-      setTagInput('');
+      const data = await res.json();
+      if (data.secure_url) {
+        setImageUrl(data.secure_url);
+        toast.success('Image uploadée !');
+      } else {
+        toast.error('Erreur upload image');
+      }
+    } catch {
+      toast.error('Erreur lors de l\'upload');
+    } finally {
+      setUploading(false);
     }
   };
 
-  const removeTag = (tag: string) => {
-    setFormData({
-      ...formData,
-      tags: formData.tags?.filter((t) => t !== tag),
-    });
+  const onSubmit = async (data: FormData) => {
+    setSubmitting(true);
+    try {
+      const eventDate = new Date(`${data.date}T${data.startTime}`);
+      const eventId = await createEvent({
+        title: data.title,
+        description: data.description,
+        date: eventDate,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        category: data.category as EventCategory,
+        maxParticipants: data.maxParticipants ? Number(data.maxParticipants) : undefined,
+        visibility: data.visibility,
+        isFree: data.isFree,
+        price: data.isFree ? undefined : (data.price ? Number(data.price) : undefined),
+        imageUrl: imageUrl || undefined,
+        organizerId: session.user.id,
+        organizerName: session.user.name,
+        organizerAvatar: session.user.image || undefined,
+        participantCount: 0,
+        sponsored: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      if (eventId) {
+        toast.success('Événement créé ! 🎉');
+        router.push(`/events/${eventId}`);
+      } else {
+        toast.error('Erreur lors de la création');
+      }
+    } catch {
+      toast.error('Une erreur est survenue');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      
       <main className="flex-1 py-8 px-4">
-        <div className="container mx-auto max-w-3xl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Créer un événement</h1>
-            <p className="text-muted-foreground">
-              Partagez votre événement avec la communauté
-            </p>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Détails de l'événement</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Title */}
-                <div className="space-y-2">
-                  <Label htmlFor="title">Titre de l'événement *</Label>
-                  <Input
-                    id="title"
-                    required
-                    placeholder="Ex: Concert de musique électronique"
-                    value={formData.title || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description *</Label>
-                  <textarea
-                    id="description"
-                    required
-                    rows={5}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    placeholder="Décrivez votre événement..."
-                    value={formData.description || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* Date & Time */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Date *</Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      required
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          date: new Date(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="time">Heure *</Label>
-                    <Input
-                      id="time"
-                      type="time"
-                      required
-                      onChange={(e) => {
-                        const [hours, minutes] = e.target.value.split(':');
-                        const date = new Date(formData.date || new Date());
-                        date.setHours(parseInt(hours), parseInt(minutes));
-                        setFormData({ ...formData, date });
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Location */}
-                <div className="space-y-2">
-                  <Label htmlFor="address">Adresse *</Label>
-                  <Input
-                    id="address"
-                    required
-                    placeholder="Rue et numéro"
-                    value={formData.address || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, address: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="city">Ville *</Label>
-                  <Input
-                    id="city"
-                    required
-                    placeholder="Ex: Lausanne"
-                    value={formData.city || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, city: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* Category */}
-                <div className="space-y-2">
-                  <Label htmlFor="category">Catégorie *</Label>
-                  <select
-                    id="category"
-                    required
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        category: e.target.value as EventCategory,
-                      })
-                    }
+        <div className="container mx-auto max-w-2xl">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              Créer un événement ✨
+            </h1>
+            <p className="text-muted-foreground mb-8">Partage quelque chose d'incroyable avec ta communauté</p>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Image Upload */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Image de couverture</CardTitle></CardHeader>
+                <CardContent>
+                  <div
+                    className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    <option value="music">Musique</option>
-                    <option value="sport">Sport</option>
-                    <option value="art">Art</option>
-                    <option value="food">Food</option>
-                    <option value="networking">Networking</option>
-                    <option value="party">Soirée</option>
-                    <option value="outdoor">Extérieur</option>
-                    <option value="gaming">Gaming</option>
-                    <option value="education">Éducation</option>
-                    <option value="other">Autre</option>
-                  </select>
-                </div>
-
-                {/* Tags */}
-                <div className="space-y-2">
-                  <Label htmlFor="tags">Tags</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="tags"
-                      placeholder="Ajouter un tag"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addTag();
-                        }
-                      }}
-                    />
-                    <Button type="button" onClick={addTag} variant="outline">
-                      <Plus className="h-4 w-4" />
+                    {imageUrl ? (
+                      <img src={imageUrl} alt="Preview" className="max-h-48 mx-auto rounded-lg object-cover" />
+                    ) : (
+                      <div className="text-muted-foreground">
+                        {uploading ? (
+                          <Loader2 className="h-8 w-8 mx-auto animate-spin mb-2" />
+                        ) : (
+                          <ImageIcon className="h-8 w-8 mx-auto mb-2" />
+                        )}
+                        <p className="text-sm">{uploading ? 'Upload en cours...' : 'Clique pour ajouter une image'}</p>
+                      </div>
+                    )}
+                  </div>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                  {imageUrl && (
+                    <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => setImageUrl('')}>
+                      Supprimer l'image
                     </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.tags?.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm flex items-center gap-2"
-                      >
-                        {tag}
-                        <button type="button" onClick={() => removeTag(tag)}>
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                  )}
+                </CardContent>
+              </Card>
 
-                {/* Max Participants */}
-                <div className="space-y-2">
-                  <Label htmlFor="maxParticipants">
-                    Nombre maximum de participants (optionnel)
-                  </Label>
-                  <Input
-                    id="maxParticipants"
-                    type="number"
-                    min="1"
-                    placeholder="Illimité"
-                    value={formData.maxParticipants || ''}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maxParticipants: parseInt(e.target.value) || undefined,
-                      })
-                    }
-                  />
-                </div>
-
-                {/* Price */}
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="isFree"
-                      checked={formData.isFree}
-                      onChange={(e) =>
-                        setFormData({ ...formData, isFree: e.target.checked })
-                      }
-                      className="h-4 w-4"
+              {/* Basic Info */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Informations</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="title">Titre *</Label>
+                    <Input id="title" placeholder="Un titre accrocheur..." className="mt-1" {...register('title')} />
+                    {errors.title && <p className="text-xs text-destructive mt-1">{errors.title.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="description">Description *</Label>
+                    <textarea
+                      id="description"
+                      placeholder="Décris ton événement..."
+                      className="w-full mt-1 px-3 py-2 rounded-md border border-input bg-background text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-ring"
+                      {...register('description')}
                     />
-                    <Label htmlFor="isFree">Événement gratuit</Label>
+                    {errors.description && <p className="text-xs text-destructive mt-1">{errors.description.message}</p>}
                   </div>
+                  <div>
+                    <Label htmlFor="category">Catégorie *</Label>
+                    <select id="category" className="w-full mt-1 px-3 py-2 rounded-md border border-input bg-background text-sm" {...register('category')}>
+                      <option value="music">Musique</option>
+                      <option value="sport">Sport</option>
+                      <option value="culture">Culture</option>
+                      <option value="gaming">Gaming</option>
+                      <option value="food">Food</option>
+                      <option value="party">Soirée</option>
+                      <option value="outdoor">Extérieur</option>
+                      <option value="networking">Networking</option>
+                      <option value="education">Éducation</option>
+                      <option value="other">Autre</option>
+                    </select>
+                  </div>
+                </CardContent>
+              </Card>
 
-                  {!formData.isFree && (
-                    <div className="space-y-2 mt-4">
-                      <Label htmlFor="price">Prix (CHF) *</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required={!formData.isFree}
-                        value={formData.price || ''}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            price: parseFloat(e.target.value),
-                          })
-                        }
-                      />
+              {/* Date & Location */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Date & Lieu</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="date">Date *</Label>
+                      <Input id="date" type="date" className="mt-1" {...register('date')} />
+                      {errors.date && <p className="text-xs text-destructive mt-1">{errors.date.message}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="startTime">Heure de début *</Label>
+                      <Input id="startTime" type="time" className="mt-1" {...register('startTime')} />
+                      {errors.startTime && <p className="text-xs text-destructive mt-1">{errors.startTime.message}</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="endTime">Heure de fin</Label>
+                    <Input id="endTime" type="time" className="mt-1" {...register('endTime')} />
+                  </div>
+                  <div>
+                    <Label htmlFor="location">Lieu (adresse) *</Label>
+                    <Input id="location" placeholder="Ex: Rue du Lac 5, Lausanne" className="mt-1" {...register('location')} />
+                    {errors.location && <p className="text-xs text-destructive mt-1">{errors.location.message}</p>}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Settings */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Paramètres</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="maxParticipants">Max participants</Label>
+                      <Input id="maxParticipants" type="number" min="1" placeholder="Illimité" className="mt-1" {...register('maxParticipants')} />
+                    </div>
+                    <div>
+                      <Label htmlFor="visibility">Visibilité</Label>
+                      <select id="visibility" className="w-full mt-1 px-3 py-2 rounded-md border border-input bg-background text-sm" {...register('visibility')}>
+                        <option value="public">Public</option>
+                        <option value="private">Privé</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Prix</Label>
+                    <div className="flex gap-3 mt-2">
+                      <button
+                        type="button"
+                        className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${isFree ? 'bg-green-500 text-white border-green-500' : 'bg-background border-input hover:bg-accent'}`}
+                        onClick={() => setValue('isFree', true)}
+                      >
+                        Gratuit
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${!isFree ? 'bg-purple-600 text-white border-purple-600' : 'bg-background border-input hover:bg-accent'}`}
+                        onClick={() => setValue('isFree', false)}
+                      >
+                        Payant
+                      </button>
+                    </div>
+                  </div>
+                  {!isFree && (
+                    <div>
+                      <Label htmlFor="price">Montant (CHF)</Label>
+                      <Input id="price" type="number" min="0" step="0.5" placeholder="0.00" className="mt-1" {...register('price')} />
                     </div>
                   )}
-                </div>
+                </CardContent>
+              </Card>
 
-                {/* Visibility */}
-                <div className="space-y-2">
-                  <Label htmlFor="visibility">Visibilité</Label>
-                  <select
-                    id="visibility"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    value={formData.visibility}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        visibility: e.target.value as 'public' | 'private',
-                      })
-                    }
-                  >
-                    <option value="public">Public</option>
-                    <option value="private">Privé (sur invitation)</option>
-                  </select>
-                </div>
-
-                {/* Image Upload */}
-                <div className="space-y-2">
-                  <Label htmlFor="image">Image de couverture</Label>
-                  <div className="border-2 border-dashed border-input rounded-lg p-8 text-center">
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Glissez-déposez une image ou cliquez pour parcourir
-                    </p>
-                    <Input
-                      id="image"
-                      type="file"
-                      accept="image/*"
-                      className="max-w-xs mx-auto"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setFormData({ ...formData, image: file });
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Submit Buttons */}
-                <div className="flex gap-4 pt-4">
-                  <Button
-                    type="submit"
-                    className="flex-1"
-                    disabled={loading}
-                  >
-                    {loading ? 'Création...' : 'Publier l\'événement'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.push('/dashboard')}
-                  >
-                    Annuler
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+              <Button
+                type="submit"
+                className="w-full h-12 text-base bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0"
+                disabled={submitting || uploading}
+              >
+                {submitting ? <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Création...</> : 'Créer l\'événement 🚀'}
+              </Button>
+            </form>
+          </motion.div>
         </div>
       </main>
-
       <Footer />
     </div>
   );

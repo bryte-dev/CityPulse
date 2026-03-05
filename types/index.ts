@@ -6,54 +6,47 @@ export interface User {
   avatar?: string;
   bio?: string;
   role: 'participant' | 'organizer' | 'admin';
+  stripeCustomerId?: string;
+  subscriptionStatus?: 'free' | 'pro';
   createdAt: Date;
   updatedAt: Date;
 }
 
 // Event Types
+export type EventCategory =
+  | 'music'
+  | 'sport'
+  | 'culture'
+  | 'gaming'
+  | 'food'
+  | 'party'
+  | 'outdoor'
+  | 'networking'
+  | 'education'
+  | 'other';
+
 export interface Event {
   id: string;
   title: string;
   description: string;
   date: Date;
-  endDate?: Date;
-  location: {
-    address: string;
-    city: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-  };
+  startTime?: string;
+  endTime?: string;
+  location: string;
   organizerId: string;
   organizerName: string;
   organizerAvatar?: string;
   category: EventCategory;
-  tags: string[];
   imageUrl?: string;
   maxParticipants?: number;
-  currentParticipants: number;
+  participantCount: number;
   visibility: 'public' | 'private';
   price?: number;
   isFree: boolean;
-  status: 'draft' | 'published' | 'cancelled' | 'completed';
-  participants: string[];
-  invitedUsers?: string[];
+  sponsored?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
-
-export type EventCategory = 
-  | 'music'
-  | 'sport'
-  | 'art'
-  | 'food'
-  | 'networking'
-  | 'party'
-  | 'outdoor'
-  | 'gaming'
-  | 'education'
-  | 'other';
 
 // Comment Types
 export interface Comment {
@@ -62,72 +55,53 @@ export interface Comment {
   userId: string;
   userName: string;
   userAvatar?: string;
-  content: string;
+  text: string;
   rating?: number;
+  parentCommentId?: string | null;
   createdAt: Date;
-  updatedAt: Date;
 }
 
-// Chat Message Types
-export interface ChatMessage {
+// Registration Types
+export interface Registration {
   id: string;
   eventId: string;
   userId: string;
   userName: string;
   userAvatar?: string;
-  content: string;
-  createdAt: Date;
-}
-
-// Notification Types
-export interface Notification {
-  id: string;
-  userId: string;
-  type: 'event_update' | 'event_cancelled' | 'new_participant' | 'event_reminder';
-  eventId: string;
-  eventTitle: string;
-  message: string;
-  read: boolean;
-  createdAt: Date;
+  registeredAt: Date;
 }
 
 // Filter Types
 export interface EventFilters {
   search?: string;
-  category?: EventCategory;
-  date?: Date;
-  location?: string;
+  category?: EventCategory | '';
+  date?: 'today' | 'week' | 'month' | '';
   isFree?: boolean;
-  sortBy?: 'date' | 'popularity' | 'proximity';
+  sortBy?: 'date' | 'popularity';
   viewMode?: 'grid' | 'list';
 }
 
 // Dashboard Stats
 export interface DashboardStats {
   totalEvents: number;
-  activeEvents: number;
   totalParticipants: number;
   averageRating: number;
-  upcomingEvents: number;
-  completedEvents: number;
 }
 
 // Form Types
 export interface CreateEventFormData {
   title: string;
   description: string;
-  date: Date;
-  endDate?: Date;
-  address: string;
-  city: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  location: string;
   category: EventCategory;
-  tags: string[];
   maxParticipants?: number;
   visibility: 'public' | 'private';
   price?: number;
   isFree: boolean;
-  invitedUsers?: string[];
-  image?: File;
+  imageUrl?: string;
 }
 
 export interface LoginFormData {
@@ -139,5 +113,4 @@ export interface RegisterFormData {
   email: string;
   password: string;
   name: string;
-  role: 'participant' | 'organizer';
 }
