@@ -5,7 +5,19 @@ import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Calendar, Menu, User, Plus, Sun, Moon, X, LayoutDashboard, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useSession, signOut } from '@/lib/auth-client';
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { firebaseAuth } from '@/lib/firebase';
+
+function useSession() {
+  const [session, setSession] = useState<{ user: any } | null>(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setSession(user ? { user } : null);
+    });
+    return () => unsubscribe();
+  }, []);
+  return { data: session };
+}
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -69,7 +81,7 @@ export function Navbar() {
                     <User className="h-5 w-5" />
                   </Button>
                 </Link>
-                <Button variant="ghost" size="icon" onClick={() => signOut()}>
+                <Button variant="ghost" size="icon" onClick={() => firebaseSignOut(firebaseAuth)}>
                   <LogOut className="h-5 w-5" />
                 </Button>
               </>
@@ -130,7 +142,7 @@ export function Navbar() {
                     <User className="h-4 w-4 mr-2" />Profil
                   </Button>
                 </Link>
-                <Button variant="ghost" className="w-full" size="sm" onClick={() => { signOut(); setMobileMenuOpen(false); }}>
+                <Button variant="ghost" className="w-full" size="sm" onClick={() => { firebaseSignOut(firebaseAuth); setMobileMenuOpen(false); }}>
                   <LogOut className="h-4 w-4 mr-2" />Se déconnecter
                 </Button>
               </>

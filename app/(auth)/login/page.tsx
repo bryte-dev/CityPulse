@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Mail, Lock, Chrome } from 'lucide-react';
-import { signIn } from '@/lib/auth-client';
+import { firebaseAuth } from '@/lib/firebase';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const schema = z.object({
   email: z.string().email('Email invalide'),
@@ -29,25 +30,27 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const result = await signIn.email({ email: data.email, password: data.password });
-      if (result.error) {
-        toast.error(result.error.message || 'Identifiants incorrects');
-      } else {
-        toast.success('Connexion réussie !');
-        router.push('/');
-      }
-    } catch {
-      toast.error('Une erreur est survenue');
+      await signInWithEmailAndPassword(firebaseAuth, data.email, data.password);
+      toast.success('Connexion réussie !');
+      router.push('/');
+    } catch (err: any) {
+      toast.error(err?.message || 'Identifiants incorrects');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
+    setLoading(true);
     try {
-      await signIn.social({ provider: 'google', callbackURL: '/' });
-    } catch {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(firebaseAuth, provider);
+      toast.success('Connexion Google réussie !');
+      router.push('/');
+    } catch (err: any) {
       toast.error('Erreur lors de la connexion Google');
+    } finally {
+      setLoading(false);
     }
   };
 

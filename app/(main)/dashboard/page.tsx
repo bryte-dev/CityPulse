@@ -12,10 +12,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Plus, Trash2, Edit, Copy, Users, Star, Calendar, BarChart3 } from 'lucide-react';
-import { useSession } from '@/lib/auth-client';
 import { getUserEvents, deleteEvent, createEvent, getEventComments } from '@/lib/db';
 import type { Event } from '@/types';
 import { formatDate } from '@/lib/utils';
+import { onAuthStateChanged } from 'firebase/auth';
+import { firebaseAuth } from '@/lib/firebase';
+
+function useSession() {
+  const [session, setSession] = useState<{ user: any } | null>(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setSession(user ? { user } : null);
+    });
+    return () => unsubscribe();
+  }, []);
+  return { data: session };
+}
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -24,6 +36,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [ratings, setRatings] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      if (!user) router.push('/login');
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     if (!session?.user) { setLoading(false); return; }

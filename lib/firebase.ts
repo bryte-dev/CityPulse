@@ -41,3 +41,6 @@ export function getFirebaseAuth(): Auth {
 export const app = typeof window !== 'undefined' ? getFirebaseApp() : undefined;
 export const db = typeof window !== 'undefined' ? getFirebaseDb() : undefined as unknown as Firestore;
 export const auth = typeof window !== 'undefined' ? getFirebaseAuth() : undefined as unknown as Auth;
+
+const firebaseApp = initializeApp(firebaseConfig);
+export const firebaseAuth = getAuth(firebaseApp);

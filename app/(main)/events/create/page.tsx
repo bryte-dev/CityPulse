@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -17,9 +17,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ImageIcon, Loader2, Upload } from 'lucide-react';
-import { useSession } from '@/lib/auth-client';
+import { onAuthStateChanged } from 'firebase/auth';
+import { firebaseAuth } from '@/lib/firebase';
 import { createEvent } from '@/lib/db';
 import type { EventCategory } from '@/types';
+
+function useSession() {
+  const [session, setSession] = useState<{ user: any } | null>(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setSession(user ? { user } : null);
+    });
+    return () => unsubscribe();
+  }, []);
+  return { data: session };
+}
 
 const schema = z.object({
   title: z.string().min(3, 'Titre trop court'),
@@ -81,7 +93,12 @@ export default function CreateEventPage() {
       const formData = new FormData();
       formData.append('file', file);
       // Upload preset must be created in Cloudinary as an unsigned preset
-      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'citypulse_events';
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+      if (!uploadPreset) {
+        toast.error('Configuration Cloudinary: upload preset manquant');
+        setUploading(false);
+        return;
+      }
       formData.append('upload_preset', uploadPreset);
       formData.append('folder', 'citypulse/events');
       const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {

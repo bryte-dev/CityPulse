@@ -3,6 +3,9 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { firebaseAuth } from '@/lib/firebase';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -14,11 +17,23 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { EventCard } from '@/components/events/EventCard';
 import { User, Edit2, Save, X, Calendar, UserCheck } from 'lucide-react';
-import { useSession } from '@/lib/auth-client';
 import { getUserEvents, getUserRegistrations, getEvent, upsertUser, getUser } from '@/lib/db';
 import type { Event, User as UserType } from '@/types';
 
+// Remplace l'ancien import par le hook local basé sur Firebase
+function useSession() {
+  const [session, setSession] = useState<{ user: any } | null>(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setSession(user ? { user } : null);
+    });
+    return () => unsubscribe();
+  }, []);
+  return { data: session };
+}
+
 export default function ProfilePage() {
+  const router = useRouter();
   const { data: session } = useSession();
   const [myEvents, setMyEvents] = useState<Event[]>([]);
   const [participatingEvents, setParticipatingEvents] = useState<Event[]>([]);
@@ -26,6 +41,13 @@ export default function ProfilePage() {
   const [bio, setBio] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      if (!user) router.push('/login');
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     if (!session?.user) { setLoading(false); return; }

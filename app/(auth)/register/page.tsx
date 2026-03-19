@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Mail, Lock, User, Chrome } from 'lucide-react';
-import { signUp, signIn } from '@/lib/auth-client';
+import { firebaseAuth } from '@/lib/firebase';
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const schema = z.object({
   name: z.string().min(2, 'Nom trop court'),
@@ -32,25 +33,30 @@ export default function RegisterPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const result = await signUp.email({ email: data.email, password: data.password, name: data.name });
-      if (result.error) {
-        toast.error(result.error.message || 'Erreur lors de l\'inscription');
-      } else {
-        toast.success('Compte créé ! Bienvenue sur CityPulse 🎉');
-        router.push('/');
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
+      if (data.name) {
+        await updateProfile(userCredential.user, { displayName: data.name });
       }
-    } catch {
-      toast.error('Une erreur est survenue');
+      toast.success('Compte créé ! Bienvenue sur CityPulse 🎉');
+      router.push('/');
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de l'inscription");
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
+    setLoading(true);
     try {
-      await signIn.social({ provider: 'google', callbackURL: '/' });
-    } catch {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(firebaseAuth, provider);
+      toast.success('Connexion Google réussie !');
+      router.push('/');
+    } catch (err: any) {
       toast.error('Erreur lors de la connexion Google');
+    } finally {
+      setLoading(false);
     }
   };
 

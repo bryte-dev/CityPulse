@@ -14,13 +14,25 @@ import { Footer } from '@/components/layout/Footer';
 import {
   Calendar, MapPin, Users, Clock, ArrowLeft, Star, Send, Trash2, MessageCircle, UserCheck, UserMinus
 } from 'lucide-react';
-import { useSession } from '@/lib/auth-client';
+import { onAuthStateChanged } from 'firebase/auth';
+import { firebaseAuth } from '@/lib/firebase';
 import {
   getEvent, getEventRegistrations, getRegistration, createRegistration, deleteRegistration,
   getEventComments, createComment, deleteComment
 } from '@/lib/db';
 import type { Event, Registration, Comment } from '@/types';
 import { formatDate } from '@/lib/utils';
+
+function useSession() {
+  const [session, setSession] = useState<{ user: any } | null>(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setSession(user ? { user } : null);
+    });
+    return () => unsubscribe();
+  }, []);
+  return { data: session };
+}
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

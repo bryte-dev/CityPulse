@@ -1,31 +1,14 @@
-import { betterAuth } from "better-auth";
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 
-// Better-Auth configuration
-// Note: This uses SQLite for local development. For production with Firestore,
-// you would configure Better-Auth to use a Firestore adapter or keep using SQLite
-// for auth data while application data (events, comments) uses Firestore.
-// Better-Auth SQLite database is separate from Firebase Firestore.
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
 
-export const auth = betterAuth({
-  database: {
-    provider: "sqlite",
-    url: "./db.sqlite",
-  },
-  emailAndPassword: {
-    enabled: true,
-  },
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      enabled: !!process.env.GOOGLE_CLIENT_ID,
-    },
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID || "",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
-      enabled: !!process.env.GITHUB_CLIENT_ID,
-    },
-  },
-  secret: process.env.BETTER_AUTH_SECRET || "development-secret-key-change-in-production",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-});
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);

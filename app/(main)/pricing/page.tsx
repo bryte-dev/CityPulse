@@ -10,7 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Check, Zap, Heart } from 'lucide-react';
-import { useSession } from '@/lib/auth-client';
+import { onAuthStateChanged } from 'firebase/auth';
+import { firebaseAuth } from '@/lib/firebase';
+
+function useSession() {
+  const [session, setSession] = useState<{ user: any } | null>(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setSession(user ? { user } : null);
+    });
+    return () => unsubscribe();
+  }, []);
+  return { data: session };
+}
 
 const FREE_FEATURES = [
   'Découvrir les événements publics',
