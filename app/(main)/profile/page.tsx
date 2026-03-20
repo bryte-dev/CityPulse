@@ -18,6 +18,7 @@ import { Footer } from '@/components/layout/Footer';
 import { EventCard } from '@/components/events/EventCard';
 import { User, Edit2, Save, X, Calendar, UserCheck } from 'lucide-react';
 import { getUserEvents, getUserRegistrations, getEvent, upsertUser, getUser } from '@/lib/db';
+import { getAuth, updateProfile } from 'firebase/auth';
 import type { Event, User as UserType } from '@/types';
 
 // Remplace l'ancien import par le hook local basé sur Firebase
@@ -25,7 +26,11 @@ function useSession() {
   const [session, setSession] = useState<{ user: any } | null>(null);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-      setSession(user ? { user } : null);
+      if (user) {
+        setSession({ user: { id: user.uid, name: user.displayName || user.email || '', image: user.photoURL || undefined, email: user.email || undefined } });
+      } else {
+        setSession(null);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -37,10 +42,13 @@ export default function ProfilePage() {
   const { data: session } = useSession();
   const [myEvents, setMyEvents] = useState<Event[]>([]);
   const [participatingEvents, setParticipatingEvents] = useState<Event[]>([]);
+  const [dbUser, setDbUser] = useState<UserType | null>(null);
   const [editing, setEditing] = useState(false);
   const [bio, setBio] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [subscribing, setSubscribing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
@@ -63,6 +71,7 @@ export default function ProfilePage() {
       setParticipatingEvents(participantEvs.filter(Boolean) as Event[]);
       setBio(userData?.bio || '');
       setName(userData?.name || session.user.name || '');
+      setDbUser(userData || null);
       setLoading(false);
     };
     load();
@@ -71,8 +80,66 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!session?.user) return;
     await upsertUser(session.user.id, { bio, name });
+    try {
+      const auth = getAuth();
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: name });
+      }
+    } catch (e) {
+      console.error('Error updating auth profile', e);
+    }
     toast.success('Profil mis à jour !');
     setEditing(false);
+  };
+
+  const handleSubscribe = async () => {
+    if (!session?.user) { window.location.href = '/sign-in'; return; }
+    setSubscribing(true);
+    try {
+      const idToken = await (await import('firebase/auth')).getAuth().currentUser?.getIdToken();
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
+        body: JSON.stringify({ priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_test' }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error('Erreur lors de la redirection vers le paiement');
+      }
+    } catch (e) {
+      console.error('Subscribe error', e);
+      toast.error('Une erreur est survenue');
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!session?.user) return;
+    if (!confirm('Confirmer l\'annulation de votre abonnement Pro ?')) return;
+    setCancelling(true);
+    try {
+      const idToken = await (await import('firebase/auth')).getAuth().currentUser?.getIdToken();
+      const res = await fetch('/api/stripe/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
+      });
+      const data = await res.json();
+      if (data.success) {
+        const refreshed = await getUser(session.user.id);
+        setDbUser(refreshed || null);
+        toast.success('Abonnement annulé. Ton compte repasse au plan Gratuit.');
+      } else {
+        toast.error(data?.error || 'Impossible d\'annuler l\'abonnement');
+      }
+    } catch (e) {
+      console.error('Cancel error', e);
+      toast.error('Une erreur est survenue');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   if (!session?.user) {
@@ -108,7 +175,12 @@ export default function ProfilePage() {
                     {editing ? (
                       <Input value={name} onChange={(e) => setName(e.target.value)} className="font-bold text-lg h-8" />
                     ) : (
-                      <h1 className="text-xl font-bold">{session.user.name}</h1>
+                      <div className="flex items-center gap-2">
+                        <h1 className="text-xl font-bold">{session.user.name}</h1>
+                        {dbUser?.subscriptionStatus === 'pro' && (
+                          <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded-full">Pro</span>
+                        )}
+                      </div>
                     )}
                     <p className="text-sm text-muted-foreground">{session.user.email}</p>
                   </div>
@@ -153,6 +225,27 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+
+              {/* Subscription Overview */}
+              <Card className="border-border/50">
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold">Abonnement</h3>
+                      <p className="text-sm text-muted-foreground">Statut: {dbUser?.subscriptionStatus === 'pro' ? 'Pro' : 'Gratuit'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {dbUser?.subscriptionStatus === 'pro' ? (
+                        <>
+                          <Button size="sm" variant="outline" onClick={handleCancel} disabled={cancelling}>{cancelling ? 'Annulation...' : 'Annuler l\'abonnement'}</Button>
+                        </>
+                      ) : (
+                        <Button size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0" onClick={handleSubscribe} disabled={subscribing}>{subscribing ? 'Redirection...' : 'Passer Pro'}</Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
             {/* My Events */}
             <div>

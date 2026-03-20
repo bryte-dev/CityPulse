@@ -9,11 +9,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { auth } = await import('@/lib/auth');
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    // Read ID token from Authorization header
+    const authHeader = request.headers.get('authorization') || '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    if (!idToken) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+
+    // Initialize Firebase Admin dynamically and verify token
+    const admin = await import('firebase-admin');
+    if (!admin.apps || admin.apps.length === 0) {
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey,
+        } as any),
+      });
     }
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    if (!decoded || !decoded.uid) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
 
     const stripe = new Stripe(stripeSecret, { apiVersion: '2026-01-28.clover' });
     const { priceId } = await request.json();
@@ -24,8 +38,8 @@ export async function POST(request: Request) {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${process.env.BETTER_AUTH_URL || 'http://localhost:3000'}/pricing?success=true`,
       cancel_url: `${process.env.BETTER_AUTH_URL || 'http://localhost:3000'}/pricing?canceled=true`,
-      customer_email: session.user.email,
-      metadata: { userId: session.user.id },
+      customer_email: decoded.email,
+      metadata: { userId: decoded.uid },
     });
 
     return NextResponse.json({ url: checkoutSession.url });

@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public reads for events and ads
+    match /events/{docId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin();
+    }
+
+    match /ads/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /ad_impressions/{docId} {
+      // impressions are recorded by client; allow create to anyone but restrict deletes
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /ad_clicks/{docId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /support_messages/{docId} {
+      // Allow anyone to create a support message; only admins can read/delete
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Users: allow users to read/update their own profile, admins can read all
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Config docs used for admin list
+    match /config/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    function isAdmin() {
+      return request.auth != null && (// check admin uids list doc
+        get(/databases/$(database)/documents/config/admins).data.uids.hasAny([request.auth.uid])
+      );
+    }
+  }
+}

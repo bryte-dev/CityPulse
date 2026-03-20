@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { getUser } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
@@ -17,7 +18,11 @@ function useSession() {
   const [session, setSession] = useState<{ user: any } | null>(null);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-      setSession(user ? { user } : null);
+      if (user) {
+        setSession({ user: { id: user.uid, name: user.displayName || user.email || '', image: user.photoURL || undefined, email: user.email || undefined } });
+      } else {
+        setSession(null);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -44,6 +49,21 @@ function PricingContent() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [dbUser, setDbUser] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const u = await getUser(session.user.id);
+        if (mounted) setDbUser(u);
+      } catch (e) {
+        console.error('Error loading user in pricing', e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
@@ -60,9 +80,11 @@ function PricingContent() {
     }
     setLoading(true);
     try {
+      // get Firebase ID token to authenticate server-side
+      const idToken = await (await import('firebase/auth')).getAuth().currentUser?.getIdToken();
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
         body: JSON.stringify({ priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_test' }),
       });
       const data = await res.json();
@@ -76,6 +98,31 @@ function PricingContent() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const canShowSimulate = typeof window !== 'undefined' && (document.cookie.includes('presentation_token=presentation_ok') || process.env.NEXT_PUBLIC_ALLOW_SIMULATE === 'true');
+
+  const handleSimulate = async () => {
+    if (!session?.user) { window.location.href = '/sign-in'; return; }
+    setLoading(true);
+    try {
+      const idToken = await (await import('firebase/auth')).getAuth().currentUser?.getIdToken();
+      const res = await fetch('/api/stripe/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Abonnement simulé — vous êtes maintenant Pro (demo)');
+        const u = await getUser(session.user.id);
+        setDbUser(u);
+      } else {
+        toast.error(data?.error || 'Impossible de simuler');
+      }
+    } catch (e) {
+      console.error('Simulate error', e);
+      toast.error('Erreur');
+    } finally { setLoading(false); }
   };
 
   return (
@@ -113,7 +160,11 @@ function PricingContent() {
                       ))}
                     </ul>
                     {session?.user ? (
-                      <Button variant="outline" className="w-full" disabled>Plan actuel</Button>
+                      dbUser?.subscriptionStatus === 'pro' ? (
+                        <Button variant="outline" className="w-full" disabled>Plan Pro actif</Button>
+                      ) : (
+                        <Button variant="outline" className="w-full" disabled>Plan actuel</Button>
+                      )
                     ) : (
                       <Link href="/sign-up">
                         <Button variant="outline" className="w-full">Commencer gratuitement</Button>
@@ -146,13 +197,22 @@ function PricingContent() {
                         </li>
                       ))}
                     </ul>
-                    <Button
-                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0"
-                      onClick={handleSubscribe}
-                      disabled={loading}
-                    >
-                      {loading ? 'Redirection...' : 'S\'abonner au plan Pro'}
-                    </Button>
+                    {dbUser?.subscriptionStatus === 'pro' ? (
+                      <Button className="w-full" disabled>Plan Pro actif</Button>
+                    ) : (
+                      <div className="space-y-2">
+                        <Button
+                          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0"
+                          onClick={handleSubscribe}
+                          disabled={loading}
+                        >
+                          {loading ? 'Redirection...' : 'S\'abonner au plan Pro'}
+                        </Button>
+                        {canShowSimulate && (
+                          <Button variant="outline" className="w-full" onClick={handleSimulate}>Simuler paiement (demo)</Button>
+                        )}
+                      </div>
+                    )}
                     {process.env.NODE_ENV === 'development' && (
                       <p className="text-xs text-center text-muted-foreground">
                         Mode test : carte <code className="font-mono bg-muted px-1 py-0.5 rounded">4242 4242 4242 4242</code>

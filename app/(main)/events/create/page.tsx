@@ -19,14 +19,18 @@ import { Footer } from '@/components/layout/Footer';
 import { ImageIcon, Loader2, Upload } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { firebaseAuth } from '@/lib/firebase';
-import { createEvent } from '@/lib/db';
+import { createEvent, getUser, getUserEventsCountSince } from '@/lib/db';
 import type { EventCategory } from '@/types';
 
 function useSession() {
   const [session, setSession] = useState<{ user: any } | null>(null);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-      setSession(user ? { user } : null);
+      if (user) {
+        setSession({ user: { id: user.uid, name: user.displayName || user.email || '', image: user.photoURL || undefined, email: user.email || undefined } });
+      } else {
+        setSession(null);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -122,6 +126,23 @@ export default function CreateEventPage() {
   const onSubmit = async (data: FormData) => {
     setSubmitting(true);
     try {
+      // enforce organizer limits for non-Pro users: 2 events per month
+      const NON_PRO_MONTHLY_LIMIT = 2;
+      try {
+        const userDoc = await getUser(session.user.id);
+        if (userDoc?.subscriptionStatus !== 'pro') {
+          const now = new Date();
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          const createdCount = await getUserEventsCountSince(session.user.id, startOfMonth);
+          if (createdCount >= NON_PRO_MONTHLY_LIMIT) {
+            toast.error(`Limite atteinte : seuls les organisateurs Pro peuvent créer plus de ${NON_PRO_MONTHLY_LIMIT} événements par mois.`);
+            setSubmitting(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Error checking organizer monthly limits', e);
+      }
       const eventDate = new Date(`${data.date}T${data.startTime}`);
       const eventId = await createEvent({
         title: data.title,

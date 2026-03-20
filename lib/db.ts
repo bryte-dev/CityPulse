@@ -66,12 +66,17 @@ export const getEvent = async (id: string): Promise<Event | null> => {
 
 export const createEvent = async (eventData: Omit<Event, 'id'>): Promise<string | null> => {
   try {
-    const docRef = await addDoc(collection(db, 'events'), {
-      ...eventData,
-      date: Timestamp.fromDate(eventData.date),
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+    // Build payload and remove undefined fields (Firestore rejects undefined)
+    const payload: any = { ...eventData };
+    payload.participantCount = eventData.participantCount ?? 0;
+    payload.date = Timestamp.fromDate(eventData.date);
+    payload.createdAt = Timestamp.now();
+    payload.updatedAt = Timestamp.now();
+    // remove keys with undefined values
+    Object.keys(payload).forEach((k) => {
+      if (payload[k] === undefined) delete payload[k];
     });
+    const docRef = await addDoc(collection(db, 'events'), payload);
     return docRef.id;
   } catch (error) {
     console.error('Error creating event:', error);
@@ -82,7 +87,14 @@ export const createEvent = async (eventData: Omit<Event, 'id'>): Promise<string 
 export const updateEvent = async (id: string, eventData: Partial<Event>): Promise<boolean> => {
   try {
     const docRef = doc(db, 'events', id);
-    await updateDoc(docRef, { ...eventData, updatedAt: Timestamp.now() });
+    const payload: any = { ...eventData };
+    if (payload.date && payload.date instanceof Date) payload.date = Timestamp.fromDate(payload.date as Date);
+    payload.updatedAt = Timestamp.now();
+    // remove undefined fields
+    Object.keys(payload).forEach((k) => {
+      if (payload[k] === undefined) delete payload[k];
+    });
+    await updateDoc(docRef, payload);
     return true;
   } catch (error) {
     console.error('Error updating event:', error);
@@ -211,8 +223,12 @@ export const getEventComments = async (eventId: string): Promise<Comment[]> => {
 
 export const createComment = async (commentData: Omit<Comment, 'id'>): Promise<string | null> => {
   try {
+    // Remove undefined fields (Firestore rejects undefined values)
+    const payload: any = { ...commentData };
+    if (payload.rating === undefined) delete payload.rating;
+    if (payload.parentCommentId === undefined) delete payload.parentCommentId;
     const docRef = await addDoc(collection(db, 'comments'), {
-      ...commentData,
+      ...payload,
       createdAt: Timestamp.now(),
     });
     return docRef.id;
@@ -283,5 +299,61 @@ export const getUserEvents = async (userId: string): Promise<Event[]> => {
   } catch (error) {
     console.error('Error getting user events:', error);
     return [];
+  }
+};
+
+// Count events created by a user since a given date
+export const getUserEventsCountSince = async (userId: string, since: Date): Promise<number> => {
+  try {
+    const q = query(
+      collection(db, 'events'),
+      where('organizerId', '==', userId),
+      where('createdAt', '>=', Timestamp.fromDate(since))
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.size;
+  } catch (error) {
+    console.error('Error counting user events since date:', error);
+    return 0;
+  }
+};
+
+// Ads (demo support)
+export const getAds = async (): Promise<Array<{ id: string; imageUrl?: string; link?: string; title?: string }>> => {
+  try {
+    const snapshot = await getDocs(collection(db, 'ads'));
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any;
+  } catch (e) {
+    console.error('Error fetching ads', e);
+    return [];
+  }
+};
+
+export const recordAdImpression = async (adId: string): Promise<void> => {
+  try {
+    await addDoc(collection(db, 'ad_impressions'), { adId, createdAt: Timestamp.now() });
+    await updateDoc(doc(db, 'ads', adId), { impressions: increment(1) });
+  } catch (e) {
+    console.error('Error recording ad impression', e);
+  }
+};
+
+export const recordAdClick = async (adId: string): Promise<void> => {
+  try {
+    await addDoc(collection(db, 'ad_clicks'), { adId, createdAt: Timestamp.now() });
+    await updateDoc(doc(db, 'ads', adId), { clicks: increment(1) });
+  } catch (e) {
+    console.error('Error recording ad click', e);
+  }
+};
+
+// Support messages (contact form)
+export const createSupportMessage = async (data: { name?: string; email?: string; message: string }) => {
+  try {
+    const docRef = await addDoc(collection(db, 'support_messages'), { ...data, createdAt: Timestamp.now() });
+    return docRef.id;
+  } catch (e) {
+    console.error('Error creating support message', e);
+    return null;
   }
 };

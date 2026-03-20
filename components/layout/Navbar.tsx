@@ -12,7 +12,11 @@ function useSession() {
   const [session, setSession] = useState<{ user: any } | null>(null);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-      setSession(user ? { user } : null);
+      if (user) {
+        setSession({ user: { id: user.uid, name: user.displayName || user.email || '', image: user.photoURL || undefined, email: user.email || undefined } });
+      } else {
+        setSession(null);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -24,8 +28,24 @@ export function Navbar() {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
   const { data: session } = useSession();
+  const [dbUser, setDbUser] = useState<any | null>(null);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!session?.user) { setDbUser(null); return; }
+    let mounted = true;
+    (async () => {
+      try {
+        const { getUser } = await import('@/lib/db');
+        const u = await getUser(session.user.id);
+        if (mounted) setDbUser(u);
+      } catch (e) {
+        console.error('Error fetching user for navbar', e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [session?.user?.id]);
 
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
@@ -77,9 +97,14 @@ export function Navbar() {
                   </Button>
                 </Link>
                 <Link href="/profile">
-                  <Button variant="ghost" size="icon">
-                    <User className="h-5 w-5" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" title={dbUser?.name || session.user.name}>
+                      <User className="h-5 w-5" />
+                    </Button>
+                    {dbUser?.subscriptionStatus === 'pro' && (
+                      <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded-full">Pro</span>
+                    )}
+                  </div>
                 </Link>
                 <Button variant="ghost" size="icon" onClick={() => firebaseSignOut(firebaseAuth)}>
                   <LogOut className="h-5 w-5" />

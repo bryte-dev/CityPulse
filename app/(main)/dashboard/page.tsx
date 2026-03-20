@@ -22,7 +22,11 @@ function useSession() {
   const [session, setSession] = useState<{ user: any } | null>(null);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-      setSession(user ? { user } : null);
+      if (user) {
+        setSession({ user: { id: user.uid, name: user.displayName || user.email || '', image: user.photoURL || undefined, email: user.email || undefined } });
+      } else {
+        setSession(null);
+      }
     });
     return () => unsubscribe();
   }, []);

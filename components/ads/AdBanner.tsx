@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { getAds, recordAdImpression, recordAdClick } from '@/lib/db';
+import { useState, useRef } from 'react';
 
 interface AdBannerProps {
   slot?: string;
@@ -17,6 +19,8 @@ const formatDimensions = {
 export function AdBanner({ slot, format = 'rectangle', className = '' }: AdBannerProps) {
   const adsenseId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
   const { width, height } = formatDimensions[format];
+  const [demoAds, setDemoAds] = useState<any[]>([]);
+  const currentAdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (adsenseId && typeof window !== 'undefined') {
@@ -24,6 +28,18 @@ export function AdBanner({ slot, format = 'rectangle', className = '' }: AdBanne
         // @ts-expect-error adsbygoogle is injected by script
         (window.adsbygoogle = window.adsbygoogle || []).push({});
       } catch {}
+    }
+    // load demo ads when no adsense configured but demo mode enabled
+    const demoMode = process.env.NEXT_PUBLIC_ADS_DEMO === 'true';
+    if (!adsenseId && demoMode) {
+      (async () => {
+        try {
+          const ads = await getAds();
+          setDemoAds(ads);
+        } catch (e) {
+          // ignore
+        }
+      })();
     }
   }, [adsenseId]);
 
@@ -39,6 +55,31 @@ export function AdBanner({ slot, format = 'rectangle', className = '' }: AdBanne
           data-ad-format="auto"
           data-full-width-responsive="true"
         />
+      </div>
+    );
+  }
+  // Demo ad fallback: show first demo ad and track impressions/clicks
+  if (demoAds.length > 0) {
+    const ad = demoAds[0];
+    if (currentAdRef.current !== ad.id) {
+      // record impression once
+      currentAdRef.current = ad.id;
+      recordAdImpression(ad.id).catch(() => {});
+    }
+    return (
+      <div className={`relative cursor-pointer overflow-hidden rounded-xl ${className}`} style={{ width, height }} onClick={() => { recordAdClick(ad.id).catch(() => {}); window.open(ad.link || '#', '_blank'); }}>
+        <span className="absolute top-1 left-2 text-[10px] text-muted-foreground/60 z-10">Publicité</span>
+        {ad.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={ad.imageUrl} alt={ad.title || 'Publicité'} style={{ width, height, objectFit: 'cover' }} />
+        ) : (
+          <div className="flex items-center justify-center h-full bg-muted/30">
+            <div className="text-center">
+              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-1">Annonce démo</p>
+              <p className="text-xs text-muted-foreground/40">{ad.title || 'Sponsorisé'}</p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

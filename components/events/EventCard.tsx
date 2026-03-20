@@ -1,11 +1,13 @@
-'use client';
+"use client";
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Calendar, MapPin, Users, Star } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type { Event } from '@/types';
 import { formatDate } from '@/lib/utils';
+import { getUser } from '@/lib/db';
 
 interface EventCardProps {
   event: Event;
@@ -38,6 +40,19 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function EventCard({ event }: EventCardProps) {
+  const [dbUser, setDbUser] = useState<any | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const u = await getUser(event.organizerId);
+        if (mounted) setDbUser(u);
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
+  }, [event.organizerId]);
   const gradientClass = getGradientClass(event.id);
   return (
     <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ duration: 0.2 }}>
@@ -84,11 +99,16 @@ export function EventCard({ event }: EventCardProps) {
             </div>
           </CardContent>
           <CardFooter className="p-4 pt-0">
-            <div className="flex items-center text-sm text-muted-foreground">
-              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white text-xs font-semibold mr-2">
-                {event.organizerName.charAt(0).toUpperCase()}
+            <div className="flex items-center text-sm text-muted-foreground gap-2">
+              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white text-xs font-semibold">
+                {((event.organizerName || '') as string).charAt(0).toUpperCase()}
               </div>
-              <span className="line-clamp-1 text-xs">{event.organizerName}</span>
+              <div className="flex items-center gap-2">
+                <span className="line-clamp-1 text-xs">{event.organizerName}</span>
+                {dbUser?.subscriptionStatus === 'pro' && (
+                  <span className="px-2 py-0.5 text-xxs bg-yellow-100 text-yellow-800 rounded-full text-[10px]">Pro</span>
+                )}
+              </div>
             </div>
           </CardFooter>
         </Card>
