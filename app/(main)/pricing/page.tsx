@@ -166,7 +166,7 @@ function PricingContent() {
                         <Button variant="outline" className="w-full" disabled>Plan actuel</Button>
                       )
                     ) : (
-                      <Link href="/sign-up">
+                      <Link href="/login">
                         <Button variant="outline" className="w-full">Commencer gratuitement</Button>
                       </Link>
                     )}

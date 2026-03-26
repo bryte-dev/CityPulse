@@ -92,13 +92,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           eventId: id,
           userId: session.user.id,
           userName: session.user.name,
-          userAvatar: session.user.image || undefined,
+          userAvatar: session.user.image || '',
           registeredAt: new Date(),
         });
         if (regId) {
           const reg: Registration = {
             id: regId, eventId: id, userId: session.user.id,
-            userName: session.user.name, userAvatar: session.user.image || undefined,
+            userName: session.user.name, userAvatar: session.user.image || '',
             registeredAt: new Date(),
           };
           setMyRegistration(reg);
@@ -124,7 +124,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         eventId: id,
         userId: session.user.id,
         userName: session.user.name,
-        userAvatar: session.user.image || undefined,
+        userAvatar: session.user.image || '',
         text: text.trim(),
         rating: parentId ? undefined : rating,
         parentCommentId: parentId || null,
@@ -133,7 +133,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (commentId) {
         const newComment: Comment = {
           id: commentId, eventId: id, userId: session.user.id,
-          userName: session.user.name, userAvatar: session.user.image || undefined,
+          userName: session.user.name, userAvatar: session.user.image || '',
           text: text.trim(), rating: parentId ? undefined : rating,
           parentCommentId: parentId || null, createdAt: new Date(),
         };

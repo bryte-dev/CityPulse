@@ -21,7 +21,7 @@ export default function ContactPage() {
     if (!message) return toast.error('Message requis');
     setLoading(true);
     try {
-      await createSupportMessage({ name: name || undefined, email: email || undefined, message });
+      await createSupportMessage({ name: name || '', email: email, message });
       toast.success('Message envoyé — nous reviendrons vers vous.');
       setName(''); setEmail(''); setMessage('');
     } catch (e) {
@@ -44,7 +44,7 @@ export default function ContactPage() {
                   <Input value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
                 <div>
-                  <Label>Email (optionnel)</Label>
+                  <Label>Email</Label>
                   <Input value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
                 <div>

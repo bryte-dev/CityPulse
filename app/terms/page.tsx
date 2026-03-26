@@ -13,7 +13,7 @@ export default function TermsPage() {
           <Card>
             <CardContent>
               <CardTitle>Conditions d'utilisation (placeholder)</CardTitle>
-              <p className="text-sm text-muted-foreground mt-4">Ceci est une page de conditions d'utilisation minimaliste destinée à la présentation. Elle ne remplace pas des conditions légales rédigées par un professionnel. Si tu veux, je peux générer une version plus complète à partir d'un modèle, sans clauses de remboursement spécifiques comme demandé.</p>
+              <p className="text-sm text-muted-foreground mt-4">Ceci est une page de conditions d'utilisation minimaliste destinée à la présentation. Elle ne remplace pas des conditions légales rédigées par un professionnel.</p>
               <h3 className="mt-4 font-semibold">Résumé</h3>
               <ul className="list-disc pl-6 text-sm mt-2">
                 <li>Utilisation du service à titre informatif et de démonstration.</li>

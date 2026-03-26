@@ -26,9 +26,8 @@ export async function POST(request: Request) {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.metadata?.userId;
       if (userId) {
-        // Use Firebase Admin SDK on the server to update Firestore
         const admin = await import('firebase-admin');
-        if (!admin.apps || admin.apps.length === 0) {
+        if (!admin.apps.length) {
           const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
           admin.initializeApp({
             credential: admin.credential.cert({
@@ -38,10 +37,10 @@ export async function POST(request: Request) {
             } as any),
           });
         }
-        await admin.firestore().doc(`users/${userId}`).update({
+        await admin.firestore().doc(`users/${userId}`).set({
           subscriptionStatus: 'pro',
           stripeCustomerId: session.customer,
-        });
+        }, { merge: true });
       }
     }
 

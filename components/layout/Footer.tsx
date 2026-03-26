@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Github, Twitter, Instagram } from 'lucide-react';
+import { TwitterLogo, GithubLogo, InstagramLogo } from "phosphor-react";
 
 export function Footer() {
   return (
@@ -65,13 +65,13 @@ export function Footer() {
             <h3 className="font-semibold mb-4">Réseaux sociaux</h3>
             <div className="flex space-x-4">
               <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                <Twitter className="h-5 w-5" />
+                <TwitterLogo className="w-6 h-6" weight="fill" />
               </a>
               <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                <Instagram className="h-5 w-5" />
+                <InstagramLogo className="w-6 h-6" weight="fill" />
               </a>
               <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                <Github className="h-5 w-5" />
+                <GithubLogo className="w-6 h-6" weight="fill" />
               </a>
             </div>
           </div>

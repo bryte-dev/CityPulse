@@ -11,8 +11,9 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { GoogleLogo } from "phosphor-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Mail, Lock, User, Chrome } from 'lucide-react';
+import { Calendar, Mail, Lock, User } from 'lucide-react';
 import { firebaseAuth } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
@@ -78,7 +79,7 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button variant="outline" className="w-full" onClick={handleGoogle} type="button">
-              <Chrome className="h-4 w-4 mr-2" />Continuer avec Google
+              <GoogleLogo className="w-6 h-6" weight="fill" />Continuer avec Google
             </Button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
